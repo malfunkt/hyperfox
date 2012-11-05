@@ -15,7 +15,7 @@ other actions at a very detailed level.
 Before installing make sure you have a [working Go environment][1] and [git][2].
 
 ```
-% go install github.com/xiam/hyperfox
+% go get github.com/xiam/hyperfox
 % hyperfox
 ```
 
