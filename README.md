@@ -14,7 +14,7 @@ other actions at a very detailed level.
 
 Before installing make sure you have a [working Go environment][1] and [git][2].
 
-```
+```sh
 % go get github.com/xiam/hyperfox
 % hyperfox
 ```
@@ -27,19 +27,19 @@ the only traffic to analyze is its own.
 A common usage on a LAN is putting the host machine in [forwarding mode][3], this will
 allow the host to forward traffic and be used as a gateway.
 
-```
+```sh
 # Linux
-sysctl net.ipv4.ip_forward=1
+sysctl -w net.ipv4.ip_forward=1
 
 # FreeBSD/OSX
-sysctl net.inet.ip.forwarding=1
+sysctl -w net.inet.ip.forwarding=1
 ```
 
 Then prepare the host machine to actually forward everything but the port we want to
 analyze, we need all the traffic to this port to be redirected to the port `hyperfox`
 is listening.
 
-```
+```sh
 # Linux
 iptables -A PREROUTING -t nat -i wlan0 -p tcp --destination-port 80 -j REDIRECT --to-port 9999
 
@@ -48,9 +48,9 @@ ipfw add fwd 127.0.0.1,9999 tcp from any to any 80 via wlan0
 ```
 
 Finally, use [ARP spoofing][4] to trick other machines into *think* our host machine is
-its router.
+their router.
 
-```
+```sh
 arpspoof -i wlan0 -t 10.0.0.123 10.0.0.1
 ```
 
