@@ -61,6 +61,14 @@ type Proxy struct {
 	Loggers   []Logger
 }
 
+type ProxyRequest struct {
+	*Proxy
+	http.ResponseWriter
+	*http.Request
+	*http.Response
+	Id string
+}
+
 /*
 	Returns a new Proxy.
 */
@@ -70,6 +78,35 @@ func New() *Proxy {
 	self.Directors = []Director{}
 	self.Bind = "0.0.0.0:9999"
 	return self
+}
+
+func (self *Proxy) NewProxyRequest(wri http.ResponseWriter, req *http.Request) *ProxyRequest {
+	var err error
+
+	r := &ProxyRequest{ self, wri, req, nil, generateRequestId(req) }
+
+	out := new(http.Request)
+
+	transport := http.DefaultTransport
+
+	*out = *req
+	out.Proto = "HTTP/1.1"
+	out.ProtoMajor = 1
+	out.ProtoMinor = 1
+	out.Close = false
+
+	out.URL.Scheme = "http"
+	out.URL.Host = req.Host
+
+	out.Header.Add("Host", req.Host)
+
+	r.Response, err = transport.RoundTrip(out)
+
+	if err != nil {
+		log.Printf("Error: %s\n", err.Error())
+	}
+
+	return r
 }
 
 /*
@@ -121,29 +158,8 @@ func copyHeader(dst http.Header, src http.Header) {
 	Should not be called directly.
 */
 func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
-
-	out := new(http.Request)
-
-	transport := http.DefaultTransport
-
-	*out = *req
-	out.Proto = "HTTP/1.1"
-	out.ProtoMajor = 1
-	out.ProtoMinor = 1
-	out.Close = false
-
-	out.URL.Scheme = "http"
-	out.URL.Host = req.Host
-
-	out.Header.Add("Host", req.Host)
-
-	res, err := transport.RoundTrip(out)
-
-	if err != nil {
-		panic(err)
-	}
-
-	self.intercept(wri, res)
+	proxy := self.NewProxyRequest(wri, req)
+	proxy.Intercept()
 }
 
 /*
@@ -173,7 +189,8 @@ func ArchiveFile(res *http.Response) string {
 	return file
 }
 
-func now() string {
+func generateRequestId(req *http.Request) string {
+
 	t := time.Now().Local()
 	name := fmt.Sprintf(
 		"%04d%02d%02d-%02d%02d%02d-%09d",
@@ -202,7 +219,7 @@ func ClientFile(res *http.Response) string {
 
 	clientAddr := strings.SplitN(res.Request.RemoteAddr, ":", 2)
 
-	file = ClientDir + PS + clientAddr[0] + PS + res.Request.URL.Host + PS + file + PS + now()
+	file = ClientDir + PS + clientAddr[0] + PS + res.Request.URL.Host + PS + file + PS + generateRequestId(res.Request)
 
 	return file
 }
@@ -215,46 +232,46 @@ func Workdir(dir string) error {
 	Catches a server response and processes it before sending it
 	to the client.
 */
-func (self *Proxy) intercept(dst http.ResponseWriter, res *http.Response) {
+func (self *ProxyRequest) Intercept() {
 	var i int
 
 	/* Applying directors before copying headers. */
 	for i, _ = range self.Directors {
-		self.Directors[i](res)
+		self.Directors[i](self.Response)
 	}
 
 	/* Copying headers. */
-	copyHeader(dst.Header(), res.Header)
+	copyHeader(self.ResponseWriter.Header(), self.Response.Header)
 
 	/* Writing status. */
-	dst.WriteHeader(res.StatusCode)
+	self.ResponseWriter.WriteHeader(self.Response.StatusCode)
 
 	wclosers := []io.WriteCloser{}
 
 	/* Handling requests. */
 	for i, _ := range self.Writers {
-		wcloser := self.Writers[i](res)
+		wcloser := self.Proxy.Writers[i](self.Response)
 		if wcloser != nil {
 			wclosers = append(wclosers, wcloser)
 		}
 	}
 
 	/* Applying loggers */
-	for i, _ = range self.Loggers {
-		self.Loggers[i](res)
+	for i, _ = range self.Proxy.Loggers {
+		self.Proxy.Loggers[i](self.Response)
 	}
 
 	/* Writing response. */
-	if res.Body != nil {
-		writers := []io.Writer{dst}
+	if self.Response.Body != nil {
+		writers := []io.Writer{ self.ResponseWriter }
 		for i, _ := range wclosers {
 			writers = append(writers, wclosers[i])
 		}
-		io.Copy(io.MultiWriter(writers...), res.Body)
+		io.Copy(io.MultiWriter(writers...), self.Response.Body)
 	}
 
 	/* Closing */
-	res.Body.Close()
+	self.Response.Body.Close()
 
 	for i, _ := range wclosers {
 		wclosers[i].Close()
@@ -272,7 +289,8 @@ func (self *Proxy) Start() error {
 		Handler: self,
 	}
 
-	log.Printf("Hyperfox is ready at %s\n", self.Bind)
+	log.Printf("Hyperfox is ready.\n")
+	log.Printf("Listening at %s.\n", self.Bind)
 
 	err := self.srv.ListenAndServe()
 
