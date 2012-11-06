@@ -20,6 +20,7 @@ func main() {
 	p.AddDirector(inject.Head)
 
 	p.AddLogger(logger.Simple(os.Stdout))
+	p.AddLogger(logger.Request)
 
 	p.AddWriter(save.Body)
 	p.AddWriter(save.Head)

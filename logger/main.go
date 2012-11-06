@@ -8,6 +8,9 @@ package logger
 import (
 	"github.com/xiam/hyperfox/proxy"
 	"log"
+	"path"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 )
@@ -22,4 +25,36 @@ func Simple(fp *os.File) proxy.Logger {
 		return nil
 	}
 	return fn
+}
+
+/*
+	Records full request to a (binary) .client file.
+*/
+func Request(res *http.Response) error {
+
+	file := proxy.ClientFile(res)
+
+	fmt.Printf("--> %s\n", file)
+
+	proxy.Workdir(path.Dir(file))
+
+	fp, _ := os.Create(file)
+
+	if fp == nil {
+		return fmt.Errorf("Could not open %s for writing.\n", file)
+	}
+
+	defer fp.Close()
+
+	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", res.Request.Method, res.Request.RequestURI, res.Request.Proto))
+
+	res.Request.Header.Write(fp)
+
+	fp.WriteString("\r\n");
+
+	io.Copy(fp, res.Request.Body)
+
+	res.Request.Body.Close()
+
+	return nil
 }

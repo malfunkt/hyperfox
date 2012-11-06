@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/xiam/hyperfox/proxy"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -28,6 +29,8 @@ func Head(res *http.Response) error {
 
 	if err == nil {
 		fp, _ := os.Open(head)
+
+		log.Printf("Injecting header %s\n", head)
 
 		content, _ := ioutil.ReadAll(fp)
 
@@ -60,6 +63,8 @@ func Body(res *http.Response) error {
 
 	if err == nil {
 		fp, _ := os.Open(file)
+
+		log.Printf("Injecting body %s\n", file)
 
 		res.Header.Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
 		res.Body.Close()

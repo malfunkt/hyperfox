@@ -9,12 +9,15 @@ import (
 	"github.com/xiam/hyperfox/proxy"
 	"io"
 	"net/http"
+	"path"
 	"os"
 )
 
 func Body(res *http.Response) io.WriteCloser {
 
 	file := proxy.ArchiveFile(res)
+
+	proxy.Workdir(path.Dir(file))
 
 	fp, _ := os.Create(file)
 
@@ -24,6 +27,8 @@ func Body(res *http.Response) io.WriteCloser {
 func Head(res *http.Response) io.WriteCloser {
 
 	file := proxy.ArchiveFile(res) + ".head"
+
+	proxy.Workdir(path.Dir(file))
 
 	fp, _ := os.Create(file)
 

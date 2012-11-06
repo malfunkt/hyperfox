@@ -10,7 +10,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 	"os"
+	"fmt"
 	"path"
 	"strings"
 )
@@ -41,9 +43,10 @@ type Director func(*http.Response) error
 type Logger func(*http.Response) error
 
 /*
-	Storage directory.
+	Storage directories.
 */
 var ArchiveDir = "archive"
+var ClientDir = "client"
 
 const PS = string(os.PathSeparator)
 
@@ -132,6 +135,8 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	out.URL.Scheme = "http"
 	out.URL.Host = req.Host
 
+	out.Header.Add("Host", req.Host)
+
 	res, err := transport.RoundTrip(out)
 
 	if err != nil {
@@ -142,8 +147,8 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 }
 
 /*
-	Returns a appropriate name for a file that needs to be associated
-	with a request.
+	Returns an appropriate name for a file that needs to be associated
+	with a response.
 */
 func ArchiveFile(res *http.Response) string {
 
@@ -165,9 +170,45 @@ func ArchiveFile(res *http.Response) string {
 
 	file = ArchiveDir + PS + res.Request.URL.Host + PS + file
 
-	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
+	return file
+}
+
+func now() string {
+	t := time.Now().Local()
+	name := fmt.Sprintf(
+		"%04d%02d%02d-%02d%02d%02d-%09d",
+		t.Year(),
+		t.Month(),
+		t.Day(),
+		t.Hour(),
+		t.Minute(),
+		t.Second(),
+		t.Nanosecond(),
+	)
+	return name + ".bin"
+}
+
+/*
+	Returns an appropriate name for a file that needs to be associated
+	with a request.
+*/
+func ClientFile(res *http.Response) string {
+
+	file := strings.Trim(res.Request.URL.Path, "/")
+
+	if file == "" {
+		file = "index"
+	}
+
+	clientAddr := strings.SplitN(res.Request.RemoteAddr, ":", 2)
+
+	file = ClientDir + PS + clientAddr[0] + PS + res.Request.URL.Host + PS + file + PS + now()
 
 	return file
+}
+
+func Workdir(dir string) error {
+	return os.MkdirAll(dir, os.ModeDir|os.FileMode(0755))
 }
 
 /*
