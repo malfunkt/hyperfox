@@ -6,7 +6,7 @@
 package main
 
 import (
-	"github.com/xiam/hyperfox/director/inject"
+	//"github.com/xiam/hyperfox/director/inject"
 	"github.com/xiam/hyperfox/logger"
 	"github.com/xiam/hyperfox/proxy"
 	"github.com/xiam/hyperfox/writer/save"
@@ -16,14 +16,17 @@ import (
 func main() {
 	p := proxy.New()
 
-	p.AddDirector(inject.Body)
-	p.AddDirector(inject.Head)
+	p.AddDirector(logger.Client(os.Stdout))
 
-	p.AddLogger(logger.Simple(os.Stdout))
-	p.AddLogger(logger.Request)
+	p.AddDirector(logger.Request)
+	p.AddDirector(logger.Head)
+	p.AddDirector(logger.Body)
 
-	p.AddWriter(save.Body)
 	p.AddWriter(save.Head)
+	p.AddWriter(save.Body)
+	p.AddWriter(save.Response)
+
+	p.AddLogger(logger.Server(os.Stdout))
 
 	p.Start()
 }

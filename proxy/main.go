@@ -6,14 +6,12 @@
 package proxy
 
 import (
-	"github.com/xiam/hyperfox/mimext"
 	"io"
 	"log"
 	"net/http"
 	"time"
 	"os"
 	"fmt"
-	"path"
 	"strings"
 )
 
@@ -24,7 +22,7 @@ import (
 	Writer functions should not edit response headers or
 	body.
 */
-type Writer func(*http.Response) io.WriteCloser
+type Writer func(*ProxyRequest) io.WriteCloser
 
 /*
 	Called before giving any output to the client.
@@ -32,7 +30,7 @@ type Writer func(*http.Response) io.WriteCloser
 	Director functions can be used to edit response headers
 	and body before arriving to the client.
 */
-type Director func(*http.Response) error
+type Director func(*ProxyRequest) error
 
 /*
 	Called right before sending content to the client.
@@ -40,7 +38,7 @@ type Director func(*http.Response) error
 	Logger functions should not edit response headers or
 	body.
 */
-type Logger func(*http.Response) error
+type Logger func(*ProxyRequest) error
 
 /*
 	Storage directories.
@@ -67,6 +65,7 @@ type ProxyRequest struct {
 	*http.Request
 	*http.Response
 	Id string
+	FileName string
 }
 
 /*
@@ -81,32 +80,16 @@ func New() *Proxy {
 }
 
 func (self *Proxy) NewProxyRequest(wri http.ResponseWriter, req *http.Request) *ProxyRequest {
-	var err error
 
-	r := &ProxyRequest{ self, wri, req, nil, generateRequestId(req) }
+	pr := &ProxyRequest{}
 
-	out := new(http.Request)
+	pr.Proxy = self
+	pr.ResponseWriter = wri
+	pr.Request = req
+	pr.Id = pr.requestId()
+	pr.FileName = pr.fileName()
 
-	transport := http.DefaultTransport
-
-	*out = *req
-	out.Proto = "HTTP/1.1"
-	out.ProtoMajor = 1
-	out.ProtoMinor = 1
-	out.Close = false
-
-	out.URL.Scheme = "http"
-	out.URL.Host = req.Host
-
-	out.Header.Add("Host", req.Host)
-
-	r.Response, err = transport.RoundTrip(out)
-
-	if err != nil {
-		log.Printf("Error: %s\n", err.Error())
-	}
-
-	return r
+	return pr
 }
 
 /*
@@ -158,14 +141,103 @@ func copyHeader(dst http.Header, src http.Header) {
 	Should not be called directly.
 */
 func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
-	proxy := self.NewProxyRequest(wri, req)
-	proxy.Intercept()
+	var i int
+	var err error
+
+	/* Creating a *ProxyRequest */
+	pr := self.NewProxyRequest(wri, req)
+
+	/* Applying directors before sending request. */
+	for i, _ = range self.Directors {
+		self.Directors[i](pr)
+	}
+
+	/* Creating a request */
+	out := new(http.Request)
+
+	transport := http.DefaultTransport
+
+	*out = *pr.Request
+	out.Proto = "HTTP/1.1"
+	out.ProtoMajor = 1
+	out.ProtoMinor = 1
+	out.Close = false
+
+	out.URL.Scheme = "http"
+	out.URL.Host = pr.Request.Host
+
+	out.Header.Add("Host", pr.Request.Host)
+
+	/* Sending request */
+	pr.Response, err = transport.RoundTrip(out)
+
+	/* Waiting for an answer... */
+	if err != nil {
+		log.Printf("Error: %s\n", err.Error())
+	}
+
+	/* Copying headers. */
+	copyHeader(pr.ResponseWriter.Header(), pr.Response.Header)
+
+	/* Writing status. */
+	pr.ResponseWriter.WriteHeader(pr.Response.StatusCode)
+
+	wclosers := []io.WriteCloser{}
+
+	/* Handling writers. */
+	for i, _ := range self.Writers {
+		wcloser := self.Writers[i](pr)
+		if wcloser != nil {
+			wclosers = append(wclosers, wcloser)
+		}
+	}
+
+	/* Applying loggers */
+	for i, _ = range self.Loggers {
+		self.Loggers[i](pr)
+	}
+
+	/* Writing response. */
+	if pr.Response.Body != nil {
+		writers := []io.Writer{ pr.ResponseWriter }
+		for i, _ := range wclosers {
+			writers = append(writers, wclosers[i])
+		}
+		io.Copy(io.MultiWriter(writers...), pr.Response.Body)
+	}
+
+	/* Closing */
+	pr.Response.Body.Close()
+
+	for i, _ := range wclosers {
+		wclosers[i].Close()
+	}
 }
 
 /*
 	Returns an appropriate name for a file that needs to be associated
 	with a response.
 */
+func (self *ProxyRequest) fileName() string {
+
+	file := strings.Trim(self.Request.URL.Path, "/")
+
+	if file == "" {
+		file = "index"
+	}
+
+	addr := strings.SplitN(self.Request.RemoteAddr, ":", 2)
+
+	file = addr[0] + PS + self.Request.Host + PS + file
+
+	return file
+}
+
+/*
+	Returns an appropriate name for a file that needs to be associated
+	with a response.
+*/
+/*
 func ArchiveFile(res *http.Response) string {
 
 	contentType := res.Header.Get("Content-Type")
@@ -188,7 +260,28 @@ func ArchiveFile(res *http.Response) string {
 
 	return file
 }
+*/
 
+func (self *ProxyRequest) requestId() string {
+
+	t := time.Now().Local()
+
+	name := fmt.Sprintf(
+		"%s-%04d%02d%02d-%02d%02d%02d-%09d",
+		self.Request.Method,
+		t.Year(),
+		t.Month(),
+		t.Day(),
+		t.Hour(),
+		t.Minute(),
+		t.Second(),
+		t.Nanosecond(),
+	)
+
+	return name
+}
+
+/*
 func generateRequestId(req *http.Request) string {
 
 	t := time.Now().Local()
@@ -209,6 +302,7 @@ func generateRequestId(req *http.Request) string {
 	Returns an appropriate name for a file that needs to be associated
 	with a request.
 */
+/*
 func ClientFile(res *http.Response) string {
 
 	file := strings.Trim(res.Request.URL.Path, "/")
@@ -227,57 +321,7 @@ func ClientFile(res *http.Response) string {
 func Workdir(dir string) error {
 	return os.MkdirAll(dir, os.ModeDir|os.FileMode(0755))
 }
-
-/*
-	Catches a server response and processes it before sending it
-	to the client.
 */
-func (self *ProxyRequest) Intercept() {
-	var i int
-
-	/* Applying directors before copying headers. */
-	for i, _ = range self.Directors {
-		self.Directors[i](self.Response)
-	}
-
-	/* Copying headers. */
-	copyHeader(self.ResponseWriter.Header(), self.Response.Header)
-
-	/* Writing status. */
-	self.ResponseWriter.WriteHeader(self.Response.StatusCode)
-
-	wclosers := []io.WriteCloser{}
-
-	/* Handling requests. */
-	for i, _ := range self.Writers {
-		wcloser := self.Proxy.Writers[i](self.Response)
-		if wcloser != nil {
-			wclosers = append(wclosers, wcloser)
-		}
-	}
-
-	/* Applying loggers */
-	for i, _ = range self.Proxy.Loggers {
-		self.Proxy.Loggers[i](self.Response)
-	}
-
-	/* Writing response. */
-	if self.Response.Body != nil {
-		writers := []io.Writer{ self.ResponseWriter }
-		for i, _ := range wclosers {
-			writers = append(writers, wclosers[i])
-		}
-		io.Copy(io.MultiWriter(writers...), self.Response.Body)
-	}
-
-	/* Closing */
-	self.Response.Body.Close()
-
-	for i, _ := range wclosers {
-		wclosers[i].Close()
-	}
-
-}
 
 /*
 	Starts a web server.

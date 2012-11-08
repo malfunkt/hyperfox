@@ -11,50 +11,132 @@ import (
 	"path"
 	"fmt"
 	"io"
-	"net/http"
+	"bytes"
+	"io/ioutil"
 	"os"
 )
 
 /*
-	A very simple response logger that writes to *os.File.
+	A very simple request logger that writes to *os.File.
 */
-func Simple(fp *os.File) proxy.Logger {
-	self := log.New(fp, "", 0)
-	fn := func(res *http.Response) error {
-		self.Printf("%s %s %s %s %s %d\n", res.Request.RemoteAddr, res.Request.Method, res.Request.URL, res.Proto, res.Status, res.ContentLength)
+func Client(fp *os.File) proxy.Director {
+	self := log.New(fp, "-> ", 0)
+
+	fn := func(pr *proxy.ProxyRequest) error {
+		self.Printf(
+			"%s %s: %s %s %s %db\n",
+			pr.Request.RemoteAddr,
+			pr.Request.Host,
+			pr.Request.Method,
+			pr.Request.RequestURI,
+			pr.Request.Proto,
+			pr.Request.ContentLength,
+		)
 		return nil
 	}
+
+	return fn
+}
+
+/*
+	A very simple response logger that writes to *os.File.
+*/
+func Server(fp *os.File) proxy.Logger {
+	self := log.New(fp, "<- ", 0)
+
+	fn := func(pr *proxy.ProxyRequest) error {
+		self.Printf(
+			"%s %s: %s %s %s %db %d\n",
+			pr.Request.RemoteAddr,
+			pr.Request.Host,
+			pr.Request.Method,
+			pr.Request.RequestURI,
+			pr.Request.Proto,
+			pr.Response.ContentLength,
+			pr.Response.StatusCode,
+		)
+		return nil
+	}
+
 	return fn
 }
 
 /*
 	Records full request to a (binary) .client file.
 */
-func Request(res *http.Response) error {
+func Request(pr *proxy.ProxyRequest) error {
 
-	file := proxy.ClientFile(res)
+	file := "archive" + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id
 
-	fmt.Printf("--> %s\n", file)
+	fmt.Printf("ww %v\n", file)
 
-	proxy.Workdir(path.Dir(file))
+	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
 	fp, _ := os.Create(file)
+
+	defer fp.Close()
 
 	if fp == nil {
 		return fmt.Errorf("Could not open %s for writing.\n", file)
 	}
 
+	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
+
+	pr.Request.Header.Write(fp)
+
+	fp.WriteString("\r\n")
+
+	buf := bytes.NewBuffer(nil)
+	io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
+	pr.Request.Body = ioutil.NopCloser(buf)
+
+	return nil
+}
+
+func Body(pr *proxy.ProxyRequest) error {
+
+	file := "archive" + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
+
+	fmt.Printf("ww %v\n", file)
+
+	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
+
+	fp, _ := os.Create(file)
+
 	defer fp.Close()
 
-	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", res.Request.Method, res.Request.RequestURI, res.Request.Proto))
+	if fp == nil {
+		return fmt.Errorf("Could not open %s for writing.\n", file)
+	}
 
-	res.Request.Header.Write(fp)
+	buf := bytes.NewBuffer(nil)
+	io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
+	pr.Request.Body = ioutil.NopCloser(buf)
 
-	fp.WriteString("\r\n");
+	return nil
+}
 
-	io.Copy(fp, res.Request.Body)
+func Head(pr *proxy.ProxyRequest) error {
 
-	res.Request.Body.Close()
+	file := "archive" + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
+
+	fmt.Printf("ww %v\n", file)
+
+	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
+
+	fp, _ := os.Create(file)
+
+	defer fp.Close()
+
+	if fp == nil {
+		return fmt.Errorf("Could not open %s for writing.\n", file)
+	}
+
+	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
+
+	pr.Request.Header.Write(fp)
+
+	fp.WriteString("\r\n")
 
 	return nil
 }
