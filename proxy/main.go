@@ -303,3 +303,19 @@ func (self *Proxy) Start() error {
 
 	return self.srv.ListenAndServe()
 }
+
+/*
+	Starts a HTTPS web server.
+*/
+func (self *Proxy) StartTLS(cert string, key string) error {
+
+	self.srv = http.Server{
+		Addr:    self.Bind,
+		Handler: self,
+	}
+
+	log.Printf("Hyperfox is ready.\n")
+	log.Printf("Listening (HTTPS) at %s.\n", self.Bind)
+
+	return self.srv.ListenAndServeTLS(cert, key)
+}
