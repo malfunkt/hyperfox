@@ -1,14 +1,19 @@
 # Hyperfox
 
-Hyperfox is a command line utility for transparently hijacking HTTP traffic.
+Hyperfox is a security tool for transparently hijacking/proxying HTTP traffic.
+
+HTTPs could be hijacked/proxied if, and only if, the client accepts an insecure connection.
+
+Hyperfox could be used as a tool for auditing a wide range of applications, including
+mobile apps.
 
 ## Features
 
 * Saves all the captured data and headers.
 * Can modify response headers and body before arriving to the client.
+* Can modify client requests before sending them to the destination server.
+* Serves sites with HTTPs using a bogus certificate.
 * Supports streaming.
-* It's also a library for making HTTP proxies with *Go*, so you can customize any
-other actions at a very detailed level.
 
 ## Installation
 
@@ -16,10 +21,24 @@ Before installing make sure you have a [working Go environment][1] and [git][2].
 
 ```sh
 % go get github.com/xiam/hyperfox
-% hyperfox
+% hyperfox -h
 ```
 
 ## Usage example
+
+Run `hyperfox`, by default it will listen on 0.0.0.0:9999 in HTTP mode.
+
+```sh
+% hyperfox
+```
+
+If you want to analyze HTTPs instead of HTTP, use the `-s` flag and provide appropriate
+[cert.pem](https://github.com/xiam/hyperfox/raw/master/ssl/cert.pem) and
+[key.pem](https://github.com/xiam/hyperfox/raw/master/ssl/key.pem) files.
+
+```sh
+% hyperfox -s -c ssl/cert.pem -k ssl/key.pem
+```
 
 `hyperfox` won't be of much use if the host machine has no traffic to analyze or if
 the only traffic to analyze is its own.
@@ -36,14 +55,14 @@ sysctl -w net.inet.ip.forwarding=1
 ```
 
 Then prepare the host machine to actually forward everything but the port we want to
-analyze, we need all the traffic to this port to be redirected to the port `hyperfox`
-is listening.
+analyze (80 in this example), we need all the traffic on that port to be redirected to
+the port `hyperfox` is listening.
 
 ```sh
-# Linux
+# Linux (HTTP)
 iptables -A PREROUTING -t nat -i wlan0 -p tcp --destination-port 80 -j REDIRECT --to-port 9999
 
-# FreeBSD/OSX
+# FreeBSD/OSX (HTTP)
 ipfw add fwd 127.0.0.1,9999 tcp from any to any 80 via wlan0
 ```
 

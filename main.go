@@ -21,8 +21,8 @@ import (
 
 var flagListen = flag.String("l", "0.0.0.0:9999", "Listen on address:port.")
 var flagHttps = flag.Bool("s", false, "Serve (bogus) HTTPs.")
-var flagSslCertFile = flag.String("c", "ssl/cert.pem", "Bogus HTTP cert file.")
-var flagSslKeyFile = flag.String("k", "ssl/key.pem", "Bogus HTTP key file.")
+var flagSslCertFile = flag.String("c", "", "Path to SSL certificate file.")
+var flagSslKeyFile = flag.String("k", "", "Path to SSL key file.")
 var flagWorkdir = flag.String("o", "archive", "Working directory.")
 
 /*
@@ -33,11 +33,13 @@ func main() {
 
 	if *flagHttps == true {
 		if *flagSslCertFile == "" {
-			fmt.Errorf("Missing SSL cert file.")
+			flag.Usage()
+			fmt.Printf("Missing SSL cert file.\n")
 			return
 		}
 		if *flagSslKeyFile == "" {
-			fmt.Errorf("Missing SSL key file.")
+			flag.Usage()
+			fmt.Printf("Missing SSL key file.\n")
 			return
 		}
 	}
