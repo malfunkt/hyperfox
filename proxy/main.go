@@ -1,4 +1,6 @@
 /*
+	Hyperfox
+
 	Written by José Carlos Nieto <xiam@menteslibres.org>
 	License MIT
 */
@@ -19,46 +21,60 @@ import (
 	Returns a io.WriteCloser that will be called
 	everytime new content is received from the destination.
 
-	Writer functions should not edit response headers or
-	body.
+	Writer functions should not edit Response nor Request.
 */
 type Writer func(*ProxyRequest) io.WriteCloser
 
 /*
-	Called before giving any output to the client.
+	Director functions can be used to edit request headers
+	and body before sending them to the destination server.
 
-	Director functions can be used to edit response headers
-	and body before arriving to the client.
+	Director functions should not edit Response nor ResponseWriter.
 */
 type Director func(*ProxyRequest) error
 
 /*
-	Called right before sending content to the client.
+	Interceptor functions can be used to edit response headers
+	and body before arriving to the client.
 
-	Logger functions should not edit response headers or
-	body.
+	Interceptor functions should not edit ResponseWriter nor Request.
+*/
+type Interceptor func(*ProxyRequest) error
+
+/*
+	Logger functions could be used to log server responses.
+
+	If you need to log client request, a Director function is more appropriate.
+
+	Logger functions should not edit any property.
 */
 type Logger func(*ProxyRequest) error
 
 /*
-	Storage directories.
+	Directory to write/read files.
 */
-var ArchiveDir = "archive"
-var ClientDir = "client"
+var Workdir = "archive"
 
+/*
+	Path separator.
+*/
 const PS = string(os.PathSeparator)
 
 /*
-	Proxy.
+	Proxy handles ProxyRequests.
 */
 type Proxy struct {
 	srv       http.Server
 	Bind      string
 	Writers   []Writer
 	Directors []Director
+	Interceptors []Interceptor
 	Loggers   []Logger
 }
 
+/*
+	ProxyRequest handles communication between client and server.
+*/
 type ProxyRequest struct {
 	*Proxy
 	http.ResponseWriter
@@ -73,12 +89,13 @@ type ProxyRequest struct {
 */
 func New() *Proxy {
 	self := &Proxy{}
-	self.Writers = []Writer{}
-	self.Directors = []Director{}
 	self.Bind = "0.0.0.0:9999"
 	return self
 }
 
+/*
+	Returns a new ProxyRequest.
+*/
 func (self *Proxy) NewProxyRequest(wri http.ResponseWriter, req *http.Request) *ProxyRequest {
 
 	pr := &ProxyRequest{}
@@ -113,6 +130,16 @@ func (self *Proxy) AddDirector(dir Director) {
 }
 
 /*
+	Adds an Interceptor function to the Proxy.
+
+	Interceptor functions are called in the same order
+	they are added.
+*/
+func (self *Proxy) AddInterceptor(dir Interceptor) {
+	self.Interceptors = append(self.Interceptors, dir)
+}
+
+/*
 	Adds a Logger function to the Proxy.
 
 	Logger functions are called in the same order
@@ -136,7 +163,8 @@ func copyHeader(dst http.Header, src http.Header) {
 
 /*
 	Catches a client request and proxies it to the
-	destination server.
+	destination server, then waits for and answer and sends it back
+	to the client.
 
 	Should not be called directly.
 */
@@ -174,6 +202,11 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	/* Waiting for an answer... */
 	if err != nil {
 		log.Printf("Error: %s\n", err.Error())
+		return
+	}
+
+	for i, _ = range self.Interceptors {
+		self.Interceptors[i](pr)
 	}
 
 	/* Copying headers. */
@@ -216,7 +249,7 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 
 /*
 	Returns an appropriate name for a file that needs to be associated
-	with a response.
+	with a ProxyRequest.
 */
 func (self *ProxyRequest) fileName() string {
 
@@ -234,34 +267,8 @@ func (self *ProxyRequest) fileName() string {
 }
 
 /*
-	Returns an appropriate name for a file that needs to be associated
-	with a response.
+	Returns a unique identificator for a ProxyRequest.
 */
-/*
-func ArchiveFile(res *http.Response) string {
-
-	contentType := res.Header.Get("Content-Type")
-
-	file := strings.Trim(res.Request.URL.Path, "/")
-
-	if file == "" {
-		file = "index"
-	}
-
-	if path.Ext(file) == "" {
-		file = file + "." + mimext.Ext(contentType)
-	}
-
-	if res.Header.Get("Content-Encoding") == "gzip" {
-		file = file + ".gz"
-	}
-
-	file = ArchiveDir + PS + res.Request.URL.Host + PS + file
-
-	return file
-}
-*/
-
 func (self *ProxyRequest) requestId() string {
 
 	t := time.Now().Local()
@@ -282,48 +289,6 @@ func (self *ProxyRequest) requestId() string {
 }
 
 /*
-func generateRequestId(req *http.Request) string {
-
-	t := time.Now().Local()
-	name := fmt.Sprintf(
-		"%04d%02d%02d-%02d%02d%02d-%09d",
-		t.Year(),
-		t.Month(),
-		t.Day(),
-		t.Hour(),
-		t.Minute(),
-		t.Second(),
-		t.Nanosecond(),
-	)
-	return name + ".bin"
-}
-
-/*
-	Returns an appropriate name for a file that needs to be associated
-	with a request.
-*/
-/*
-func ClientFile(res *http.Response) string {
-
-	file := strings.Trim(res.Request.URL.Path, "/")
-
-	if file == "" {
-		file = "index"
-	}
-
-	clientAddr := strings.SplitN(res.Request.RemoteAddr, ":", 2)
-
-	file = ClientDir + PS + clientAddr[0] + PS + res.Request.URL.Host + PS + file + PS + generateRequestId(res.Request)
-
-	return file
-}
-
-func Workdir(dir string) error {
-	return os.MkdirAll(dir, os.ModeDir|os.FileMode(0755))
-}
-*/
-
-/*
 	Starts a web server.
 */
 func (self *Proxy) Start() error {
@@ -336,11 +301,5 @@ func (self *Proxy) Start() error {
 	log.Printf("Hyperfox is ready.\n")
 	log.Printf("Listening at %s.\n", self.Bind)
 
-	err := self.srv.ListenAndServe()
-
-	if err != nil {
-		log.Printf("Failed to bind.\n")
-	}
-
-	return err
+	return self.srv.ListenAndServe()
 }

@@ -1,4 +1,6 @@
 /*
+	Hyperfox
+
 	Written by José Carlos Nieto <xiam@menteslibres.org>
 	License MIT
 */
@@ -62,13 +64,11 @@ func Server(fp *os.File) proxy.Logger {
 }
 
 /*
-	Records full request to a (binary) .client file.
+	Records full request to a (binary) file.
 */
 func Request(pr *proxy.ProxyRequest) error {
 
-	file := "archive" + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id
-
-	fmt.Printf("ww %v\n", file)
+	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
@@ -93,11 +93,12 @@ func Request(pr *proxy.ProxyRequest) error {
 	return nil
 }
 
+/*
+	Records client's request body to a .body file.
+*/
 func Body(pr *proxy.ProxyRequest) error {
 
-	file := "archive" + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
-
-	fmt.Printf("ww %v\n", file)
+	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
@@ -116,11 +117,12 @@ func Body(pr *proxy.ProxyRequest) error {
 	return nil
 }
 
+/*
+	Records client's request headers to a wire formatted .head file.
+*/
 func Head(pr *proxy.ProxyRequest) error {
 
-	file := "archive" + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
-
-	fmt.Printf("ww %v\n", file)
+	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
