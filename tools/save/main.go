@@ -8,11 +8,11 @@
 package save
 
 import (
+	"fmt"
 	"github.com/xiam/hyperfox/proxy"
 	"io"
-	"fmt"
-	"path"
 	"os"
+	"path"
 )
 
 /*

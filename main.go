@@ -8,14 +8,14 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"github.com/xiam/hyperfox/proxy"
 	"github.com/xiam/hyperfox/tools/inject"
 	"github.com/xiam/hyperfox/tools/intercept"
-	"github.com/xiam/hyperfox/tools/save"
 	"github.com/xiam/hyperfox/tools/logger"
-	"github.com/xiam/hyperfox/proxy"
-	"flag"
+	"github.com/xiam/hyperfox/tools/save"
 	"log"
-	"fmt"
 	"os"
 )
 

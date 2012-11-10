@@ -8,14 +8,14 @@
 package logger
 
 import (
-	"github.com/xiam/hyperfox/proxy"
-	"log"
-	"path"
-	"fmt"
-	"io"
 	"bytes"
+	"fmt"
+	"github.com/xiam/hyperfox/proxy"
+	"io"
 	"io/ioutil"
+	"log"
 	"os"
+	"path"
 )
 
 /*

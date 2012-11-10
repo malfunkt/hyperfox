@@ -8,13 +8,13 @@
 package proxy
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"time"
 	"os"
-	"fmt"
 	"strings"
+	"time"
 )
 
 /*
@@ -64,12 +64,12 @@ const PS = string(os.PathSeparator)
 	Proxy handles ProxyRequests.
 */
 type Proxy struct {
-	srv       http.Server
-	Bind      string
-	Writers   []Writer
-	Directors []Director
+	srv          http.Server
+	Bind         string
+	Writers      []Writer
+	Directors    []Director
 	Interceptors []Interceptor
-	Loggers   []Logger
+	Loggers      []Logger
 }
 
 /*
@@ -80,7 +80,7 @@ type ProxyRequest struct {
 	http.ResponseWriter
 	*http.Request
 	*http.Response
-	Id string
+	Id       string
 	FileName string
 }
 
@@ -232,7 +232,7 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 
 	/* Writing response. */
 	if pr.Response.Body != nil {
-		writers := []io.Writer{ pr.ResponseWriter }
+		writers := []io.Writer{pr.ResponseWriter}
 		for i, _ := range wclosers {
 			writers = append(writers, wclosers[i])
 		}
