@@ -100,19 +100,22 @@ func Body(pr *proxy.ProxyRequest) error {
 
 	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
 
-	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
+	if pr.Request.ContentLength != 0 {
 
-	fp, _ := os.Create(file)
+		os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
-	defer fp.Close()
+		fp, _ := os.Create(file)
 
-	if fp == nil {
-		return fmt.Errorf("Could not open %s for writing.\n", file)
+		defer fp.Close()
+
+		if fp == nil {
+			return fmt.Errorf("Could not open %s for writing.\n", file)
+		}
+
+		buf := bytes.NewBuffer(nil)
+		io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
+		pr.Request.Body = ioutil.NopCloser(buf)
 	}
-
-	buf := bytes.NewBuffer(nil)
-	io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
-	pr.Request.Body = ioutil.NopCloser(buf)
 
 	return nil
 }

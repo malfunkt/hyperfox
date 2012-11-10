@@ -23,15 +23,19 @@ func Body(pr *proxy.ProxyRequest) io.WriteCloser {
 
 	file := proxy.Workdir + proxy.PS + "server" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
 
-	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
+	if pr.Response.ContentLength != 0 {
+		os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
-	fp, _ := os.Create(file)
+		fp, _ := os.Create(file)
 
-	if fp == nil {
-		fmt.Errorf(fmt.Sprintf("Could not open file %s for writing.", file))
+		if fp == nil {
+			fmt.Errorf(fmt.Sprintf("Could not open file %s for writing.", file))
+		}
+
+		return fp
 	}
 
-	return fp
+	return nil
 }
 
 /*
