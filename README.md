@@ -1,23 +1,24 @@
 # Hyperfox
 
-Hyperfox is a security tool for transparently hijacking/proxying HTTP traffic.
+Hyperfox is a security tool for transparently hijacking/proxying HTTP and HTTPs traffic.
 
-HTTPs could be hijacked/proxied if, and only if, the client accepts an insecure connection.
+HTTPs could be hijacked/proxied if, and only if, the client application accepts bogus
+certificates.
 
 Hyperfox could be used as a tool for auditing a wide range of applications, including
 mobile apps.
 
 ## Features
 
-* Saves all the captured data and headers.
-* Can modify response headers and body before arriving to the client.
+* Saves all the traffic between client and server.
+* Can modify server responses before arriving to the client.
 * Can modify client requests before sending them to the destination server.
-* Serves sites with HTTPs using a bogus certificate.
+* Supports SSL.
 * Supports streaming.
 
 ## Installation
 
-Before installing make sure you have a [working Go environment][1] and [git][2].
+Before installing, make sure you have a [working Go environment][1] and [git][2].
 
 ```sh
 % go get github.com/xiam/hyperfox
@@ -26,7 +27,7 @@ Before installing make sure you have a [working Go environment][1] and [git][2].
 
 ## Usage example
 
-Run `hyperfox`, by default it will listen on 0.0.0.0:9999 in HTTP mode.
+Run `hyperfox`, it will start in HTTP mode listening at `0.0.0.0:9999` by default.
 
 ```sh
 % hyperfox
