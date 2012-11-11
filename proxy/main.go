@@ -175,6 +175,8 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	/* Creating a *ProxyRequest */
 	pr := self.NewProxyRequest(wri, req)
 
+	pr.Request.Header.Add("Host", pr.Request.Host)
+
 	/* Applying directors before sending request. */
 	for i, _ = range self.Directors {
 		self.Directors[i](pr)
@@ -193,8 +195,6 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 
 	out.URL.Scheme = "http"
 	out.URL.Host = pr.Request.Host
-
-	out.Header.Add("Host", pr.Request.Host)
 
 	/* Sending request */
 	pr.Response, err = transport.RoundTrip(out)
