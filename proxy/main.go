@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"crypto/tls"
 	"os"
 	"strings"
 	"time"
@@ -182,10 +183,23 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 		self.Directors[i](pr)
 	}
 
+	pr.Request.Header.Add("Host", pr.Request.Host)
+
 	/* Creating a request */
 	out := new(http.Request)
 
-	transport := http.DefaultTransport
+	var transport *http.Transport
+	var scheme string
+
+	if req.TLS == nil {
+		transport = &http.Transport{}
+		scheme = "http"
+	} else {
+		transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		scheme = "https"
+	}
 
 	*out = *pr.Request
 	out.Proto = "HTTP/1.1"
@@ -193,7 +207,8 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	out.ProtoMinor = 1
 	out.Close = false
 
-	out.URL.Scheme = "http"
+	out.URL.Scheme = scheme
+
 	out.URL.Host = pr.Request.Host
 
 	/* Sending request */
@@ -259,9 +274,9 @@ func (self *ProxyRequest) fileName() string {
 		file = "index"
 	}
 
-	addr := strings.SplitN(self.Request.RemoteAddr, ":", 2)
+	offset := strings.LastIndex(self.Request.RemoteAddr, ":")
 
-	file = addr[0] + PS + self.Request.Host + PS + file
+	file = self.Request.RemoteAddr[0:offset] + PS + self.Request.Host + PS + file
 
 	return file
 }
