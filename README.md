@@ -1,16 +1,22 @@
 # Hyperfox
 
-Hyperfox is a security tool for transparently hijacking/proxying HTTP and HTTPs
-traffic.
-
-HTTPs could be hijacked/proxied if, and only if, the client application accepts
-bogus certificates.
+Hyperfox is a security tool for Man In The Middle operations over HTTP and
+HTTPs.
 
 Hyperfox could be used as a tool for auditing a wide range of applications,
-including mobile apps that do not properly verify certificates or that do not
-use certificates at all.
+including mobile applications that do not properly verify certificates or that
+do not use certificates at all.
 
-## Features
+Hyperfox can also be used as a library to develop special proxies, you can read
+documentation with `go doc`:
+
+```
+go doc github.com/xiam/hyperfox/proxy
+```
+
+## Features of the Hyperfox tool
+
+The Hyperfox tool has some useful features:
 
 * Saves all the traffic between client and server.
 * Can modify server responses before arriving to the client.
@@ -34,7 +40,7 @@ Run `hyperfox`, it will start in HTTP mode listening at `0.0.0.0:9999` by
 default.
 
 ```sh
-% hyperfox
+hyperfox
 ```
 
 If you want to analyze HTTPs instead of HTTP, use the `-s` flag and provide

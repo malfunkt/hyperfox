@@ -1,15 +1,17 @@
 /*
-	Hyperfox
+	Hyperfox - Man In The Middle Proxy for HTTP(s).
 
-	Written by José Carlos Nieto <xiam@menteslibres.org>
+	This is the source of the hyperfox tool (that uses hyperfox's libraries).
+
+	Written by Carlos Reventlov <carlos@reventlov.com>
 	License MIT
 */
 
 package main
 
 import (
+	"errors"
 	"flag"
-	"fmt"
 	"github.com/xiam/hyperfox/proxy"
 	"github.com/xiam/hyperfox/tools/inject"
 	"github.com/xiam/hyperfox/tools/intercept"
@@ -19,43 +21,57 @@ import (
 	"os"
 )
 
-var flagListen = flag.String("l", "0.0.0.0:9999", "Listen on address:port.")
-var flagHttps = flag.Bool("s", false, "Serve (bogus) HTTPs.")
-var flagSslCertFile = flag.String("c", "", "Path to SSL certificate file.")
-var flagSslKeyFile = flag.String("k", "", "Path to SSL key file.")
-var flagWorkdir = flag.String("o", "archive", "Working directory.")
+var (
+	flagListen      = flag.String("l", "0.0.0.0:9999", "Listen on [interface-address]:[port]. Example 192.168.2.33:9999.")
+	flagHTTPs       = flag.Bool("s", false, "Enable HTTPs.")
+	flagSSLCertFile = flag.String("c", "", "Path to SSL certificate file.")
+	flagSSLKeyFile  = flag.String("k", "", "Path to SSL key file.")
+	flagWorkdir     = flag.String("o", "capture", "Working directory.")
+)
 
-/*
-	Parses flags and pass them to the hyperfox's proxy package.
-*/
+var (
+	ErrMissingSSLCert = errors.New(`Missing SSL certificate.`)
+	ErrMissingSSLKey  = errors.New(`Missing SSL certificate key.`)
+	ErrBindFailed     = errors.New(`Failed to bind on the given interface: %s.`)
+)
+
+// Parses flags and initializes Hyperfox tool.
 func main() {
+	var err error
+
 	flag.Parse()
 
-	if *flagHttps == true {
-		if *flagSslCertFile == "" {
+	if *flagHTTPs == true {
+		// User wants HTTPs...
+		if *flagSSLCertFile == "" {
+			// ...but did not provide a certificate.
 			flag.Usage()
-			fmt.Printf("Missing SSL cert file.\n")
-			return
+			log.Fatalf(ErrMissingSSLCert.Error())
 		}
-		if *flagSslKeyFile == "" {
+		if *flagSSLKeyFile == "" {
+			// ...but did not provide the certificate key.
 			flag.Usage()
-			fmt.Printf("Missing SSL key file.\n")
-			return
+			log.Fatalf(ErrMissingSSLKey.Error())
 		}
 	}
 
+	// Alles gut. Initializing proxy.
 	p := proxy.New()
 
+	// Listen on which interface:port.
 	if *flagListen != "" {
 		p.Bind = *flagListen
 	}
 
+	// Working directory.
 	if *flagWorkdir != "" {
 		proxy.Workdir = *flagWorkdir
 	}
 
+	// Logs request to stdout.
 	p.AddDirector(logger.Client(os.Stdout))
 
+	// Logging different parts of the request to files.
 	p.AddDirector(logger.Request)
 	p.AddDirector(logger.Head)
 	p.AddDirector(logger.Body)
@@ -70,17 +86,21 @@ func main() {
 	p.AddWriter(save.Body)
 	p.AddWriter(save.Response)
 
+	// Logs responses to clients.
 	p.AddLogger(logger.Server(os.Stdout))
 
-	var err error
+	log.Printf("Hyperfox tool, by Carlos Reventlov.\n")
+	log.Printf("http://www.reventlov.com\n\n")
 
-	if *flagHttps {
-		err = p.StartTLS(*flagSslCertFile, *flagSslKeyFile)
+	if *flagHTTPs == true {
+		// HTTPs
+		err = p.StartTLS(*flagSSLCertFile, *flagSSLKeyFile)
 	} else {
+		// Normal HTTP proxy.
 		err = p.Start()
 	}
 
 	if err != nil {
-		log.Printf(fmt.Sprintf("Failed to bind: %s.\n", err.Error()))
+		log.Fatalf(ErrBindFailed.Error(), err.Error())
 	}
 }

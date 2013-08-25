@@ -1,7 +1,9 @@
 /*
-	Hyperfox
+	Hyperfox - Man In The Middle Proxy for HTTP(s).
 
-	Written by José Carlos Nieto <xiam@menteslibres.org>
+	Default loggers for the Hyperfox tool.
+
+	Written by Carlos Reventlov <carlos@reventlov.com>
 	License MIT
 */
 
@@ -9,6 +11,7 @@ package logger
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/xiam/hyperfox/proxy"
 	"io"
@@ -18,9 +21,11 @@ import (
 	"path"
 )
 
-/*
-	A very simple request logger that writes to *os.File.
-*/
+var (
+	ErrCantWriteFile = errors.New(`Can't open file "%s" for writing.`)
+)
+
+// Very simple request logger that writes to *os.File.
 func Client(fp *os.File) proxy.Director {
 	self := log.New(fp, "-> ", 0)
 
@@ -40,9 +45,7 @@ func Client(fp *os.File) proxy.Director {
 	return fn
 }
 
-/*
-	A very simple response logger that writes to *os.File.
-*/
+// A very simple response logger that writes to *os.File.
 func Server(fp *os.File) proxy.Logger {
 	self := log.New(fp, "<- ", 0)
 
@@ -63,9 +66,7 @@ func Server(fp *os.File) proxy.Logger {
 	return fn
 }
 
-/*
-	Records full request to a (binary) file.
-*/
+// Records full request to a (binary) file.
 func Request(pr *proxy.ProxyRequest) error {
 
 	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id
@@ -77,7 +78,7 @@ func Request(pr *proxy.ProxyRequest) error {
 	defer fp.Close()
 
 	if fp == nil {
-		return fmt.Errorf("Could not open %s for writing.\n", file)
+		return fmt.Errorf(ErrCantWriteFile.Error(), file)
 	}
 
 	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
@@ -93,9 +94,7 @@ func Request(pr *proxy.ProxyRequest) error {
 	return nil
 }
 
-/*
-	Records client's request body to a .body file.
-*/
+// Records client's request body to a .body file.
 func Body(pr *proxy.ProxyRequest) error {
 
 	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
@@ -109,7 +108,7 @@ func Body(pr *proxy.ProxyRequest) error {
 		defer fp.Close()
 
 		if fp == nil {
-			return fmt.Errorf("Could not open %s for writing.\n", file)
+			return fmt.Errorf(ErrCantWriteFile.Error(), file)
 		}
 
 		buf := bytes.NewBuffer(nil)
@@ -120,9 +119,7 @@ func Body(pr *proxy.ProxyRequest) error {
 	return nil
 }
 
-/*
-	Records client's request headers to a wire formatted .head file.
-*/
+// Records client's request headers to a wire formatted .head file.
 func Head(pr *proxy.ProxyRequest) error {
 
 	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
@@ -134,7 +131,7 @@ func Head(pr *proxy.ProxyRequest) error {
 	defer fp.Close()
 
 	if fp == nil {
-		return fmt.Errorf("Could not open %s for writing.\n", file)
+		return fmt.Errorf(ErrCantWriteFile.Error(), file)
 	}
 
 	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))

@@ -8,6 +8,7 @@
 package save
 
 import (
+	"errors"
 	"fmt"
 	"github.com/xiam/hyperfox/proxy"
 	"io"
@@ -15,11 +16,14 @@ import (
 	"path"
 )
 
-/*
-	Returns a WriteCloser that can be user to write the server's
-	response body to a .body file.
-*/
-func Body(pr *proxy.ProxyRequest) io.WriteCloser {
+var (
+	ErrCantWriteFile = errors.New(`Can't open file "%s" for writing.`)
+)
+
+// Returns a WriteCloser that can be user to write the server's
+// response body to a .body file.
+func Body(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
+	var err error
 
 	file := proxy.Workdir + proxy.PS + "server" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
 
@@ -29,28 +33,27 @@ func Body(pr *proxy.ProxyRequest) io.WriteCloser {
 		fp, _ := os.Create(file)
 
 		if fp == nil {
-			fmt.Errorf(fmt.Sprintf("Could not open file %s for writing.", file))
+			err = fmt.Errorf(ErrCantWriteFile.Error(), file)
 		}
 
-		return fp
+		return fp, err
 	}
 
-	return nil
+	return nil, err
 }
 
-/*
-	Writes the server response headers to a .head file.
-*/
-func Head(pr *proxy.ProxyRequest) io.WriteCloser {
+// Writes the server response headers to a .head file.
+func Head(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
+	var err error
 
-	file := "archive" + proxy.PS + "server" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
+	file := proxy.Workdir + proxy.PS + "server" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
 	fp, _ := os.Create(file)
 
 	if fp == nil {
-		fmt.Errorf(fmt.Sprintf("Could not open file %s for writing.", file))
+		err = fmt.Errorf(ErrCantWriteFile.Error(), file)
 	} else {
 		fp.WriteString(fmt.Sprintf("%s %s\r\n", pr.Response.Proto, pr.Response.Status))
 		pr.Response.Header.Write(fp)
@@ -58,28 +61,27 @@ func Head(pr *proxy.ProxyRequest) io.WriteCloser {
 		fp.Close()
 	}
 
-	return nil
+	return nil, err
 }
 
-/*
-	Writes the full server response to disk.
-*/
-func Response(pr *proxy.ProxyRequest) io.WriteCloser {
+// Writes the full server response to disk.
+func Response(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
+	var err error
 
-	file := "archive" + proxy.PS + "server" + proxy.PS + pr.FileName + proxy.PS + pr.Id
+	file := proxy.Workdir + proxy.PS + "server" + proxy.PS + pr.FileName + proxy.PS + pr.Id
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
 	fp, _ := os.Create(file)
 
 	if fp == nil {
-		fmt.Errorf(fmt.Sprintf("Could not open file %s for writing.", file))
+		err = fmt.Errorf(ErrCantWriteFile.Error(), file)
 	} else {
 		fp.WriteString(fmt.Sprintf("%s %s\r\n", pr.Response.Proto, pr.Response.Status))
 		pr.Response.Header.Write(fp)
 		fp.WriteString("\r\n")
-		return fp
+		return fp, nil
 	}
 
-	return nil
+	return nil, err
 }

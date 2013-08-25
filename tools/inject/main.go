@@ -1,10 +1,15 @@
 /*
-	Hyperfox
+	Hyperfox - Man In The Middle Proxy for HTTP(s).
 
-	Written by José Carlos Nieto <xiam@menteslibres.org>
+	Default client payload loaders for the Hyperfox tool.
+
+	Written by Carlos Reventlov <carlos@reventlov.com>
 	License MIT
 */
 
+// This package provides default directors for the Hyperfox tool. The main
+// purpose of these default directors is to check if special named payload
+// files exists, if they do, they replace the client request.
 package inject
 
 import (
@@ -16,14 +21,12 @@ import (
 	"strings"
 )
 
-/*
-	Checks for a wire formatted $HTTP_METHOD-head.payload file.
-
-	If found, the file contents will replace the original
-	client's request headers.
-
-	This file should be put in the client's working directory.
-*/
+// Checks for a wire formatted ${HTTP_METHOD}-head.payload file.
+//
+// If found, the file contents will replace the original client's request
+// headers.
+//
+// This file should be put in the request's working directory.
 func Head(pr *proxy.ProxyRequest) error {
 
 	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + fmt.Sprintf("%s-head.payload", pr.Request.Method)
@@ -50,14 +53,11 @@ func Head(pr *proxy.ProxyRequest) error {
 	return nil
 }
 
-/*
-	Checks for a raw $HTTP_METHOD-body.payload file.
-
-	If found, the file contents will replace the original
-	client's request body.
-
-	This file should be put in the client's working directory.
-*/
+// Checks for a ${HTTP_METHOD}-body.payload file.
+//
+// If found, the file contents will replace the original client's request body.
+//
+// This file should be put in the request's working directory.
 func Body(pr *proxy.ProxyRequest) error {
 
 	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + fmt.Sprintf("%s-body.payload", pr.Request.Method)
