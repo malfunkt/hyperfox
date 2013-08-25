@@ -3,16 +3,15 @@
 Hyperfox is a security tool for Man In The Middle operations over HTTP and
 HTTPs.
 
-Hyperfox could be used as a tool for auditing a wide range of applications,
+Hyperfox can be used as a tool for auditing a wide range of applications,
 including mobile applications that do not properly verify certificates or that
 do not use certificates at all.
 
-Hyperfox can also be used as a library to develop special proxies, you can read
-documentation with `go doc`:
+The `hyperfox` tool is a default distribution of the Hyperfox proxy.
 
-```
-go doc github.com/xiam/hyperfox/proxy
-```
+Hyperfox can also be used as a library to develop special proxies with [Go][1],
+if you're interested on programming a special proxy for any special MITM
+operation you may read the library documentation at [godoc.org][6].
 
 ## Features of the Hyperfox tool
 
@@ -24,10 +23,29 @@ The Hyperfox tool has some useful features:
 * Supports SSL/TLS.
 * Supports streaming.
 
-## Installation
+## Getting Hyperfox
 
-Before installing, make sure you have a [working Go environment][1] and
-[git][2].
+You can download a pre-compiled version of the Hyperfox tool:
+
+* [Linux x86_64][https://menteslibres.net/files/hyperfox/hyperfox-1.0-linux-x64]
+* [OSX x86_64][https://menteslibres.net/files/hyperfox/hyperfox-1.0-darwin-x64]
+
+Once you've downloaded the appropriate binary move it to `$HOME/bin/hyperfox`
+and call it using the full path:
+
+```
+~/bin/hyperfox -h
+```
+
+If you have `$HOME/bin` in your `$PATH`, you may as well call `hyperfox`
+without the full path:
+
+```
+hyperfox -h
+```
+
+If you have [Go][1] and [git][2] you can use `go get` to download the source
+and compile the Hyperfox tool by yourself:
 
 ```sh
 go get github.com/xiam/hyperfox
@@ -36,11 +54,44 @@ hyperfox -h
 
 ## Usage example
 
-Run `hyperfox`, it will start in HTTP mode listening at `0.0.0.0:9999` by
-default.
+A. Make sure the [dsniff][5] tool is installed in the MITM machine, we are
+going to use the `arpspoof` tool (part of [dsniff][5]) to alter the ARP table
+of a specific machine on LAN to make it redirect its traffic to us instead of
+to the legitimate LAN gateway. This ancient technique is known as
+[ARP spoofing][4].
+
+B. Identify the LAN IP of the machine you want to intercept traffic for. Let's
+suppose you want to intercept traffic from `10.0.0.146`.
+
+C. Identify the IP of your router and the name of the interface you're
+connected with, let's say your router is `10.0.0.1` and you're connected to
+the router through `wlan0`.
+
+```
+# route
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+default         10.0.0.1        0.0.0.0         UG    0      0        0 wlan0
+```
+
+D. Put the MITM machine in [IP forwarding][3] mode.
 
 ```sh
-hyperfox
+# Linux
+sysctl -w net.ipv4.ip_forward=1
+
+# FreeBSD/OSX
+sysctl -w net.inet.ip.forwarding=1
+```
+
+E. Run hyperfox:
+
+```
+$ hyperfox
+2013/08/25 08:21:36 Hyperfox tool, by Carlos Reventlov.
+2013/08/25 08:21:36 http://www.reventlov.com
+
+2013/08/25 08:21:36 Listening for HTTP client requests at 0.0.0.0:9999.
 ```
 
 If you want to analyze HTTPs instead of HTTP, use the `-s` flag and provide
@@ -52,23 +103,9 @@ appropriate
 hyperfox -s -c ssl/cert.pem -k ssl/key.pem
 ```
 
-`hyperfox` won't be of much use if the host machine has no traffic to analyze
-or if the only traffic to analyze is its own.
-
-A common usage on a LAN is putting the host machine in [forwarding mode][3],
-this will allow the host to forward traffic and be used as a gateway.
-
-```sh
-# Linux
-sysctl -w net.ipv4.ip_forward=1
-
-# FreeBSD/OSX
-sysctl -w net.inet.ip.forwarding=1
-```
-
-Then prepare the host machine to actually forward everything but the port we
-want to analyze (80 in this example), we need all the traffic on that port to
-be redirected to the port `hyperfox` is listening.
+F. Prepare the machine to forward everything but the port hyperfox will
+intercept (`80`, for plain HTTP), instead tell it to forward the traffic on
+port `80` to the `9999` port on `127.0.0.1` (where `hyperfox` is listening).
 
 ```sh
 # Linux (HTTP)
@@ -79,17 +116,21 @@ iptables -A PREROUTING -t nat -i wlan0 -p tcp --destination-port 80 -j REDIRECT 
 ipfw add fwd 127.0.0.1,9999 tcp from any to any 80 via wlan0
 ```
 
-Finally, use [ARP spoofing][4] to trick other machines into *think* our host
-is its router.
+G. Run `arpspoof` to make `10.0.0.146` think our host is `10.0.0.1` (the
+LAN's legitimate gateway), once the ARP spoofing is completed, `10.0.0.146` will
+start to send its traffic through our machine.
 
 ```sh
 arpspoof -i wlan0 -t 10.0.0.123 10.0.0.1
 ```
 
-The example above uses [arpspoof][5].
+H. !???
+
+I. Profit!
 
 [1]: http://golang.org/doc/install
 [2]: http://git-scm.com
 [3]: http://en.wikipedia.org/wiki/IP_forwarding
 [4]: http://en.wikipedia.org/wiki/ARP_spoofing
 [5]: http://monkey.org/~dugsong/dsniff/
+[6]: http://godoc.org/github.com/xiam/hyperfox/proxy
