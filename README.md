@@ -130,8 +130,9 @@ $ sudo arpspoof -i wlan0 -t 10.0.0.146 10.0.0.1
 
 **IX**. Profit!!
 
-Once `192.168.1.146` starts to send some traffic, a `capture` directory will
-be created:
+Once `10.0.0.146` starts to send some traffic, a `capture` directory will
+be created, this directory contains client requests, server responses and
+headers.
 
 ```sh
 $ cd ~/tmp/hyperfox-session
