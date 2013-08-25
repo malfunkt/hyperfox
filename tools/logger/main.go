@@ -75,11 +75,11 @@ func Request(pr *proxy.ProxyRequest) error {
 
 	fp, _ := os.Create(file)
 
-	defer fp.Close()
-
 	if fp == nil {
 		return fmt.Errorf(ErrCantWriteFile.Error(), file)
 	}
+
+	defer fp.Close()
 
 	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
 
@@ -105,11 +105,11 @@ func Body(pr *proxy.ProxyRequest) error {
 
 		fp, _ := os.Create(file)
 
-		defer fp.Close()
-
 		if fp == nil {
 			return fmt.Errorf(ErrCantWriteFile.Error(), file)
 		}
+
+		defer fp.Close()
 
 		buf := bytes.NewBuffer(nil)
 		io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
@@ -128,11 +128,11 @@ func Head(pr *proxy.ProxyRequest) error {
 
 	fp, _ := os.Create(file)
 
-	defer fp.Close()
-
 	if fp == nil {
 		return fmt.Errorf(ErrCantWriteFile.Error(), file)
 	}
+
+	defer fp.Close()
 
 	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
 

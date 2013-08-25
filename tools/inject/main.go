@@ -35,16 +35,20 @@ func Head(pr *proxy.ProxyRequest) error {
 
 	if err == nil {
 		fp, _ := os.Open(file)
-		defer fp.Close()
 
-		content, _ := ioutil.ReadAll(fp)
+		if fp != nil {
 
-		lines := strings.Split(string(content), "\n")
+			defer fp.Close()
 
-		for _, line := range lines {
-			hline := strings.SplitN(line, ":", 2)
-			if len(hline) > 1 {
-				pr.Request.Header.Set(strings.Trim(hline[0], " \r\n"), strings.Trim(hline[1], " \r\n"))
+			content, _ := ioutil.ReadAll(fp)
+
+			lines := strings.Split(string(content), "\n")
+
+			for _, line := range lines {
+				hline := strings.SplitN(line, ":", 2)
+				if len(hline) > 1 {
+					pr.Request.Header.Set(strings.Trim(hline[0], " \r\n"), strings.Trim(hline[1], " \r\n"))
+				}
 			}
 		}
 
@@ -67,11 +71,16 @@ func Body(pr *proxy.ProxyRequest) error {
 	if err == nil {
 		fp, _ := os.Open(file)
 
-		pr.Request.ContentLength = stat.Size()
-		pr.Request.Header.Set("Content-Length", strconv.Itoa(int(pr.Request.ContentLength)))
-		pr.Request.Body.Close()
+		if fp != nil {
 
-		pr.Request.Body = fp
+			defer fp.Close()
+
+			pr.Request.ContentLength = stat.Size()
+			pr.Request.Header.Set("Content-Length", strconv.Itoa(int(pr.Request.ContentLength)))
+			pr.Request.Body.Close()
+
+			pr.Request.Body = fp
+		}
 	}
 
 	return nil

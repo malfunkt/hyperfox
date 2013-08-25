@@ -1,7 +1,9 @@
 /*
-	Hyperfox
+	Hyperfox - Man In The Middle Proxy for HTTP(s).
 
-	Written by José Carlos Nieto <xiam@menteslibres.org>
+	Default Writers for the Hyperfox tool.
+
+	Written by Carlos Reventlov <carlos@reventlov.com>
 	License MIT
 */
 
@@ -36,6 +38,7 @@ func Body(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
 			err = fmt.Errorf(ErrCantWriteFile.Error(), file)
 		}
 
+		// Don't close io.WriterCloser yet.
 		return fp, err
 	}
 
@@ -55,10 +58,10 @@ func Head(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
 	if fp == nil {
 		err = fmt.Errorf(ErrCantWriteFile.Error(), file)
 	} else {
+		defer fp.Close()
 		fp.WriteString(fmt.Sprintf("%s %s\r\n", pr.Response.Proto, pr.Response.Status))
 		pr.Response.Header.Write(fp)
 		fp.WriteString("\r\n")
-		fp.Close()
 	}
 
 	return nil, err
@@ -77,6 +80,7 @@ func Response(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
 	if fp == nil {
 		err = fmt.Errorf(ErrCantWriteFile.Error(), file)
 	} else {
+		// Don't close io.WriterCloser yet.
 		fp.WriteString(fmt.Sprintf("%s %s\r\n", pr.Response.Proto, pr.Response.Status))
 		pr.Response.Header.Write(fp)
 		fp.WriteString("\r\n")
