@@ -89,11 +89,11 @@ $ sudo sysctl -w net.inet.ip.forwarding=1
 ```sh
 $ mkdir -p ~/tmp/hyperfox-session
 $ cd ~/tmp/hyperfox-session
-$ hyperfox
+$ hyperfox -l 127.0.0.1:9999
 2013/08/25 08:21:36 Hyperfox tool, by Carlos Reventlov.
 2013/08/25 08:21:36 http://www.reventlov.com
 
-2013/08/25 08:21:36 Listening for HTTP client requests at 0.0.0.0:9999.
+2013/08/25 08:21:36 Listening for HTTP client requests at 127.0.0.1:9999.
 ```
 
 If you want to analyze HTTPs instead of HTTP, use the `-s` flag and provide
@@ -102,20 +102,25 @@ appropriate
 [key.pem](https://github.com/xiam/hyperfox/raw/master/ssl/key.pem) files.
 
 ```sh
-$ hyperfox -s -c ssl/cert.pem -k ssl/key.pem
+$ hyperfox -s -c ssl/cert.pem -k ssl/key.pem -l 127.0.0.1:9999
 ```
 
 **VI**. Prepare the machine to forward everything but the port hyperfox will
-intercept (`80`, for plain HTTP), instead tell it to forward the traffic on
-port `80` to the `9999` port on `127.0.0.1` (where `hyperfox` is listening).
+intercept (`80` for plain HTTP, `443` for HTTPs), instead tell it to forward
+the traffic on port `80` to the `9999` port on `127.0.0.1` (where `hyperfox`
+is listening).
 
 ```sh
-# Linux (HTTP)
-$ sudo iptables -A PREROUTING -t nat -i wlan0 -p tcp --destination-port 80 -j \
-REDIRECT --to-port 9999
+# Linux
+$ sudo iptables -A PREROUTING -t nat -i wlan0 -p tcp --destination-port 80 -j REDIRECT --to-port 9999
 
-# FreeBSD/OSX (HTTP)
-$ sudo ipfw add fwd 127.0.0.1,9999 tcp from any to any 80 via wlan0
+# OSX
+$ echo "rdr pass on en0 proto tcp from any to any port 80 -> 127.0.0.1 port 9999" › pf.conf
+$ sudo pfctl -d
+$ sudo pfctl -e -f pf.conf
+
+# FreeBSD
+$ sudo ipfw add fwd 127.0.0.1,9999 tcp from not me to any 80 via wlan0
 ```
 
 **VII**. Run `arpspoof` to make `10.0.0.146` think our host is `10.0.0.1` (the
