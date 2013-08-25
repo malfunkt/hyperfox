@@ -266,6 +266,7 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	// Waiting for an answer.
 	if err != nil {
 		log.Printf(ErrProxyRequestFailed.Error(), err.Error())
+		return
 	}
 
 	// Running interceptors.
@@ -280,7 +281,7 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	// Writing response status.
 	pr.ResponseWriter.WriteHeader(pr.Response.StatusCode)
 
-	wclosers := []io.WriteCloser{}
+	wclosers := make([]io.WriteCloser, 0, len(self.Writers))
 
 	// Running writers.
 	for i, _ := range self.Writers {
@@ -300,7 +301,8 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 
 	// Writing response.
 	if pr.Response.Body != nil {
-		writers := []io.Writer{pr.ResponseWriter}
+		writers := make([]io.Writer, 0, len(wclosers)+1)
+		writers = append(writers, pr.ResponseWriter)
 		for i, _ := range wclosers {
 			writers = append(writers, wclosers[i])
 		}
@@ -314,6 +316,7 @@ func (self *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	for i, _ := range wclosers {
 		wclosers[i].Close()
 	}
+
 }
 
 // Returns an appropriate name for a file that needs to be associated with a

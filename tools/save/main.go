@@ -32,7 +32,11 @@ func Body(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
 	if pr.Response.ContentLength != 0 {
 		os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
-		fp, _ := os.Create(file)
+		fp, err := os.Create(file)
+
+		if err != nil {
+			return nil, err
+		}
 
 		if fp == nil {
 			err = fmt.Errorf(ErrCantWriteFile.Error(), file)
@@ -53,7 +57,11 @@ func Head(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
-	fp, _ := os.Create(file)
+	fp, err := os.Create(file)
+
+	if err != nil {
+		return nil, err
+	}
 
 	if fp == nil {
 		err = fmt.Errorf(ErrCantWriteFile.Error(), file)
@@ -75,7 +83,11 @@ func Response(pr *proxy.ProxyRequest) (io.WriteCloser, error) {
 
 	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
 
-	fp, _ := os.Create(file)
+	fp, err := os.Create(file)
+
+	if err != nil {
+		return nil, err
+	}
 
 	if fp == nil {
 		err = fmt.Errorf(ErrCantWriteFile.Error(), file)
