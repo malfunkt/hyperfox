@@ -1,144 +1,59 @@
-/*
-	Hyperfox - Man In The Middle Proxy for HTTP(s).
+// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+//
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-	Default loggers for the Hyperfox tool.
-
-	Written by Carlos Reventlov <carlos@reventlov.com>
-	License MIT
-*/
-
+// Package logger provides standard logger.
 package logger
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"github.com/xiam/hyperfox/proxy"
-	"io"
-	"io/ioutil"
-	"log"
-	"os"
-	"path"
+	"strings"
+	"time"
 )
 
-var (
-	ErrCantWriteFile = errors.New(`Can't open file "%s" for writing.`)
-)
-
-// Very simple request logger that writes to *os.File.
-func Client(fp *os.File) proxy.Director {
-	self := log.New(fp, "-> ", 0)
-
-	fn := func(pr *proxy.ProxyRequest) error {
-		self.Printf(
-			"%s %s: %s %s %s %db\n",
-			pr.Request.RemoteAddr,
-			pr.Request.Host,
-			pr.Request.Method,
-			pr.Request.RequestURI,
-			pr.Request.Proto,
-			pr.Request.ContentLength,
-		)
-		return nil
+func chunk(value string) string {
+	if value == "" {
+		return "-"
 	}
-
-	return fn
+	return value
 }
 
-// A very simple response logger that writes to *os.File.
-func Server(fp *os.File) proxy.Logger {
-	self := log.New(fp, "<- ", 0)
-
-	fn := func(pr *proxy.ProxyRequest) error {
-		self.Printf(
-			"%s %s: %s %s %s %db %d\n",
-			pr.Request.RemoteAddr,
-			pr.Request.Host,
-			pr.Request.Method,
-			pr.Request.RequestURI,
-			pr.Request.Proto,
-			pr.Response.ContentLength,
-			pr.Response.StatusCode,
-		)
-		return nil
-	}
-
-	return fn
+// Stdout struct implements proxy.Logger
+type Stdout struct {
 }
 
-// Records full request to a (binary) file.
-func Request(pr *proxy.ProxyRequest) error {
+// Log prints a standard log string to the system.
+func (s Stdout) Log(pr *proxy.ProxiedRequest) error {
 
-	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id
-
-	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
-
-	fp, _ := os.Create(file)
-
-	if fp == nil {
-		return fmt.Errorf(ErrCantWriteFile.Error(), file)
+	line := []string{
+		chunk(pr.Request.RemoteAddr),
+		chunk(""),
+		chunk(""),
+		chunk("[" + time.Now().Format("02/Jan/2006:15:04:05 -0700") + "]"),
+		chunk("\"" + fmt.Sprintf("%s %s %s", pr.Request.Method, pr.Request.URL, pr.Request.Proto) + "\""),
+		chunk(fmt.Sprintf("%d", pr.Response.StatusCode)),
+		chunk(fmt.Sprintf("%d", pr.Response.ContentLength)),
 	}
 
-	defer fp.Close()
-
-	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
-
-	pr.Request.Header.Write(fp)
-
-	fp.WriteString("\r\n")
-
-	buf := bytes.NewBuffer(nil)
-	io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
-	pr.Request.Body = ioutil.NopCloser(buf)
-
-	return nil
-}
-
-// Records client's request body to a .body file.
-func Body(pr *proxy.ProxyRequest) error {
-
-	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".body"
-
-	if pr.Request.ContentLength != 0 {
-
-		os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
-
-		fp, _ := os.Create(file)
-
-		if fp == nil {
-			return fmt.Errorf(ErrCantWriteFile.Error(), file)
-		}
-
-		defer fp.Close()
-
-		buf := bytes.NewBuffer(nil)
-		io.Copy(io.MultiWriter(fp, buf), pr.Request.Body)
-		pr.Request.Body = ioutil.NopCloser(buf)
-	}
-
-	return nil
-}
-
-// Records client's request headers to a wire formatted .head file.
-func Head(pr *proxy.ProxyRequest) error {
-
-	file := proxy.Workdir + proxy.PS + "client" + proxy.PS + pr.FileName + proxy.PS + pr.Id + ".head"
-
-	os.MkdirAll(path.Dir(file), os.ModeDir|os.FileMode(0755))
-
-	fp, _ := os.Create(file)
-
-	if fp == nil {
-		return fmt.Errorf(ErrCantWriteFile.Error(), file)
-	}
-
-	defer fp.Close()
-
-	fp.WriteString(fmt.Sprintf("%s %s %s\r\n", pr.Request.Method, pr.Request.RequestURI, pr.Request.Proto))
-
-	pr.Request.Header.Write(fp)
-
-	fp.WriteString("\r\n")
+	fmt.Println(strings.Join(line, " "))
 
 	return nil
 }
