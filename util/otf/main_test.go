@@ -1,4 +1,4 @@
-package selfssl
+package otf
 
 import (
 	"fmt"

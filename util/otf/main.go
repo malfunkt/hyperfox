@@ -19,14 +19,16 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// Package selfssl provides SSL certificates on the fly.
-package selfssl
+// Package otf provides SSL certificates on the fly.
+package otf
 
 import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/tls"
+	"crypto/x509/pkix"
+
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -43,8 +45,8 @@ const (
 )
 
 var (
-	rootCACert = "../../ssl/rootCA.crt"
-	rootCAKey  = "../../ssl/rootCA.key"
+	rootCACert = "../ssl/rootCA.crt"
+	rootCAKey  = "../ssl/rootCA.key"
 )
 
 // SetRootCACert sets the root CA cert.
@@ -73,7 +75,7 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 		return
 	}
 
-	notBefore := time.Now().Add(-24 * time.Hour)
+	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
 	var serialNumber *big.Int
@@ -85,12 +87,15 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 	}
 
 	template := x509.Certificate{
-		SerialNumber:          serialNumber,
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Acme Co"},
+			CommonName:   hostName,
+		},
+		NotBefore:   notBefore,
+		NotAfter:    notAfter,
+		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 
 	if ip := net.ParseIP(hostName); ip != nil {
@@ -117,7 +122,7 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 
 	var derBytes []byte
 
-	if derBytes, err = x509.CreateCertificate(rand.Reader, &template, rootCA.Leaf, &priv.PublicKey, priv); err != nil {
+	if derBytes, err = x509.CreateCertificate(rand.Reader, &template, rootCA.Leaf, &priv.PublicKey, rootCA.PrivateKey); err != nil {
 		return
 	}
 

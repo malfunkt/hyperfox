@@ -10,9 +10,15 @@ import (
 	"time"
 )
 
-var proxy *Proxy
+var (
+	proxy    *Proxy
+	sslProxy *Proxy
+)
 
-const listenHTTPAddr = `localhost.example.org:37400`
+const (
+	listenHTTPAddr  = `localhost.example.org:13080`
+	listenHTTPsAddr = `localhost.example.org:13443`
+)
 
 type writeCloser struct {
 	bytes.Buffer
@@ -70,7 +76,7 @@ type testDirector struct {
 }
 
 func (d testDirector) Direct(req *http.Request) error {
-	newRequest, _ := http.NewRequest("GET", "http://insecure.org/", nil)
+	newRequest, _ := http.NewRequest("GET", "https://www.example.org/", nil)
 	*req = *newRequest
 	return nil
 }
@@ -106,6 +112,18 @@ func TestListenHTTP(t *testing.T) {
 
 	go func(t *testing.T) {
 		if err := proxy.Start(listenHTTPAddr); err != nil {
+			t.Fatal(err)
+		}
+	}(t)
+
+	time.Sleep(time.Millisecond * 100)
+}
+
+func TestListenHTTPs(t *testing.T) {
+	sslProxy = NewProxy()
+
+	go func(t *testing.T) {
+		if err := sslProxy.StartTLS(listenHTTPsAddr); err != nil {
 			t.Fatal(err)
 		}
 	}(t)
@@ -279,4 +297,11 @@ func TestActualHTTPClient(t *testing.T) {
 		t.Fatal("Expecting a redirection.")
 	}
 
+}
+
+func TestHTTPsDirectorInterface(t *testing.T) {
+	// Adding a director that will change the request destination to insecure.org
+	sslProxy.AddDirector(testDirector{})
+
+	time.Sleep(time.Second * 10)
 }

@@ -24,6 +24,7 @@ package proxy
 
 import (
 	"crypto/tls"
+	"github.com/xiam/hyperfox/util/otf"
 	"io"
 	"log"
 	"net/http"
@@ -185,6 +186,8 @@ func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 			},
 		}
 		//scheme = "https"
+		pr.Request.URL.Scheme = "https"
+		pr.Request.URL.Host = pr.Request.Host
 	}
 
 	/*
@@ -193,10 +196,8 @@ func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 		out.Proto = "HTTP/1.1"
 		out.ProtoMajor = 1
 		out.ProtoMinor = 1
-		out.Close = false
 
 		out.URL.Scheme = scheme
-		out.URL.Host = pr.Request.Host
 	*/
 
 	// Proxying client request to destination server.
@@ -282,15 +283,39 @@ func (p *Proxy) Start(addr string) error {
 	return nil
 }
 
+func certificateLookup(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+
+	cert, key, err := otf.CreateKeyPair(clientHello.ServerName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var tlsCert tls.Certificate
+
+	if tlsCert, err = tls.LoadX509KeyPair(cert, key); err != nil {
+		return nil, err
+	}
+
+	return &tlsCert, nil
+}
+
 // StartTLS creates an HTTPs proxy server that listens on the given address.
-func (p *Proxy) StartTLS(addr string, cert string, key string) error {
+func (p *Proxy) StartTLS(addr string) error {
 
 	p.srv = http.Server{
 		Addr:    addr,
 		Handler: p,
+		TLSConfig: &tls.Config{
+			GetCertificate:     certificateLookup,
+			InsecureSkipVerify: false,
+		},
 	}
 
 	log.Printf("Listening for HTTPs client requests at %s.\n", addr)
+
+	cert := "../ssl/rootCA.crt"
+	key := "../ssl/rootCA.key"
 
 	if err := p.srv.ListenAndServeTLS(cert, key); err != nil {
 		return err
