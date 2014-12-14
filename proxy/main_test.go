@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"testing"
@@ -72,11 +73,20 @@ func (i testInterceptor) Intercept(res *http.Response) error {
 	return nil
 }
 
+type testDirectorSSL struct {
+}
+
+func (d testDirectorSSL) Direct(req *http.Request) error {
+	newRequest, _ := http.NewRequest("GET", "https://www.example.org/", nil)
+	*req = *newRequest
+	return nil
+}
+
 type testDirector struct {
 }
 
 func (d testDirector) Direct(req *http.Request) error {
-	newRequest, _ := http.NewRequest("GET", "https://www.example.org/", nil)
+	newRequest, _ := http.NewRequest("GET", "http://nmap.org/", nil)
 	*req = *newRequest
 	return nil
 }
@@ -287,7 +297,8 @@ func TestActualHTTPClient(t *testing.T) {
 	proxy.AddBodyWriteCloser(w)
 
 	client := &http.Client{}
-	_, err := client.Get("http://" + listenHTTPAddr)
+
+	res, err := client.Get("http://" + listenHTTPAddr)
 
 	if err != nil {
 		t.Fatal(err)
@@ -297,11 +308,21 @@ func TestActualHTTPClient(t *testing.T) {
 		t.Fatal("Expecting a redirection.")
 	}
 
+	buf := bytes.NewBuffer(nil)
+
+	if _, err := io.Copy(buf, res.Body); err != nil {
+		t.Fatal(err)
+	}
+
+	if bytes.Equal(buf.Bytes(), w.wc.Bytes()) == false {
+		t.Fatal("Responses differ.")
+	}
 }
 
 func TestHTTPsDirectorInterface(t *testing.T) {
+	sslProxy.Reset()
 	// Adding a director that will change the request destination to insecure.org
-	sslProxy.AddDirector(testDirector{})
-
+	sslProxy.AddDirector(testDirectorSSL{})
+	log.Printf("SSL proxy server will be open for 10 secs from now...")
 	time.Sleep(time.Second * 10)
 }

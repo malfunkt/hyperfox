@@ -157,52 +157,47 @@ func copyHeader(dst http.Header, src http.Header) {
 //
 // (this method should not be called directly).
 func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
+
 	var err error
-	//var scheme string
 	var transport *http.Transport
 
 	pr := p.newProxiedRequest(wri, req)
 
-	// Making sure the Host header is present.
-	pr.Request.Header.Add("Host", pr.Request.Host)
-
-	// Walking over directors.
-	for i := range p.directors {
-		if err := p.directors[i].Direct(pr.Request); err != nil {
-			log.Printf("Director: %q", err)
-		}
-	}
-
-	// Creating the request that we'll send to the legitimate destination.
-	//out := new(http.Request)
+	out := new(http.Request)
+	*out = *req
 
 	if req.TLS == nil {
 		transport = &http.Transport{}
-		//scheme = "http"
+		out.URL.Scheme = "http"
 	} else {
 		transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: false,
 			},
 		}
-		//scheme = "https"
-		pr.Request.URL.Scheme = "https"
-		pr.Request.URL.Host = pr.Request.Host
+		out.URL.Scheme = "https"
 	}
 
-	/*
-		*out = *pr.Request
+	// Making sure the Host header is present.
+	out.URL.Host = out.Host
+	out.Header.Add("Host", out.Host)
 
-		out.Proto = "HTTP/1.1"
-		out.ProtoMajor = 1
-		out.ProtoMinor = 1
+	out.Proto = "HTTP/1.1"
+	out.ProtoMajor = 1
+	out.ProtoMinor = 1
+	out.Close = false
 
-		out.URL.Scheme = scheme
-	*/
+	// Walking over directors.
+	for i := range p.directors {
+		if err := p.directors[i].Direct(out); err != nil {
+			log.Printf("Director: %q", err)
+		}
+	}
 
 	// Proxying client request to destination server.
-	if pr.Response, err = transport.RoundTrip(pr.Request); err != nil {
+	if pr.Response, err = transport.RoundTrip(out); err != nil {
 		log.Printf("RoundTrip: %q", err)
+		wri.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -234,22 +229,19 @@ func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 		ws = append(ws, w)
 	}
 
+	defer pr.Response.Body.Close()
+
 	// Writing response.
-	if pr.Response.Body != nil {
-		writers := make([]io.Writer, 0, len(ws)+1)
-		writers = append(writers, pr.ResponseWriter)
+	writers := make([]io.Writer, 0, len(ws)+1)
+	writers = append(writers, pr.ResponseWriter)
 
-		for i := range ws {
-			writers = append(writers, ws[i])
-		}
-
-		if _, err := io.Copy(io.MultiWriter(writers...), pr.Response.Body); err != nil {
-			log.Printf("io.Copy: %q", err)
-		}
+	for i := range ws {
+		writers = append(writers, ws[i])
 	}
 
-	// Closing response.
-	pr.Response.Body.Close()
+	if _, err := io.Copy(io.MultiWriter(writers...), pr.Response.Body); err != nil {
+		log.Printf("io.Copy: %q", err)
+	}
 
 	// Closing write closers.
 	for i := range ws {
