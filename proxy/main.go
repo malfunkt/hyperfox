@@ -36,7 +36,7 @@ import (
 //
 // destination -> ... -> BodyWriteCloser -> client -> ...
 type BodyWriteCloser interface {
-	NewWriteCloser() (io.WriteCloser, error)
+	NewWriteCloser(*http.Response) (io.WriteCloser, error)
 }
 
 // Director interface gets a reference of the http.Request sent by an user
@@ -222,7 +222,7 @@ func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	for i := range p.writers {
 		var w io.WriteCloser
 		var err error
-		if w, err = p.writers[i].NewWriteCloser(); err != nil {
+		if w, err = p.writers[i].NewWriteCloser(pr.Response); err != nil {
 			log.Printf("WriteCloser: %q", err)
 			continue
 		}

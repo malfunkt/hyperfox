@@ -1,38 +1,47 @@
-/*
-	Hyperfox - Man In The Middle Proxy for HTTP(s).
-
-	This is the source of the hyperfox tool (that uses hyperfox's libraries).
-
-	Written by Carlos Reventlov <carlos@reventlov.com>
-	License MIT
-*/
+// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+//
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 package main
 
 import (
-	"errors"
+	"database/sql"
 	"flag"
 	"github.com/xiam/hyperfox/proxy"
-	"github.com/xiam/hyperfox/tools/inject"
-	"github.com/xiam/hyperfox/tools/intercept"
+	"github.com/xiam/hyperfox/tools/capture"
 	"github.com/xiam/hyperfox/tools/logger"
-	"github.com/xiam/hyperfox/tools/save"
 	"log"
-	"os"
+	"upper.io/db"
+	"upper.io/db/sqlite"
+)
+
+const (
+	defaultBind = `0.0.0.0:9999`
 )
 
 var (
-	flagListen      = flag.String("l", "0.0.0.0:9999", "Listen on [interface-address]:[port]. Example 192.168.2.33:9999.")
+	flagListen      = flag.String("l", defaultBind, "Listen on [address]:[port].")
 	flagHTTPs       = flag.Bool("s", false, "Enable HTTPs.")
 	flagSSLCertFile = flag.String("c", "", "Path to SSL certificate file.")
 	flagSSLKeyFile  = flag.String("k", "", "Path to SSL key file.")
 	flagWorkdir     = flag.String("o", "capture", "Working directory.")
-)
-
-var (
-	ErrMissingSSLCert = errors.New(`Missing SSL certificate.`)
-	ErrMissingSSLKey  = errors.New(`Missing SSL certificate key.`)
-	ErrBindFailed     = errors.New(`Failed to bind on the given interface: %s.`)
 )
 
 // Parses flags and initializes Hyperfox tool.
@@ -55,52 +64,73 @@ func main() {
 		}
 	}
 
-	// Alles gut. Initializing proxy.
-	p := proxy.New()
+	var sess db.Database
 
-	// Listen on which interface:port.
-	if *flagListen != "" {
-		p.Bind = *flagListen
+	if sess, err = db.Open(sqlite.Adapter, sqlite.ConnectionURL{Database: "capture.db"}); err != nil {
+		log.Printf("SQLite: %q\n", err)
 	}
 
-	// Working directory.
-	if *flagWorkdir != "" {
-		proxy.Workdir = *flagWorkdir
+	var col db.Collection
+
+	if col, err = sess.Collection("capture"); err != nil {
+		if err == db.ErrCollectionDoesNotExist {
+			// Create collection.
+			if sqld, ok := sess.Driver().(*sql.DB); ok {
+				_, err := sqld.Exec(`CREATE TABLE "capture" (
+					"id" INTEGER PRIMARY KEY,
+					"remote_addr" VARCHAR(50),
+					"method" VARCHAR(6),
+					"status" INTEGER,
+					"host" VARCHAR(255),
+					"url" TEXT,
+					"header" TEXT,
+					"body" BLOB,
+					"date" VARCHAR(20)
+				)`)
+				if err != nil {
+					log.Printf("SQLite: %q\n", err)
+					return
+				}
+				col, err = sess.Collection("capture")
+				if err != nil {
+					log.Printf("SQLite: %q\n", err)
+					return
+				}
+			}
+			log.Printf("SQLite: %q\n", err)
+		}
 	}
 
-	// Logs request to stdout.
-	p.AddDirector(logger.Client(os.Stdout))
+	p := proxy.NewProxy()
 
-	// Logging different parts of the request to files.
-	p.AddDirector(logger.Request)
-	p.AddDirector(logger.Head)
-	p.AddDirector(logger.Body)
+	p.AddLogger(logger.Stdout{})
 
-	p.AddDirector(inject.Head)
-	p.AddDirector(inject.Body)
+	res := make(chan capture.Response, 256)
 
-	p.AddInterceptor(intercept.Head)
-	p.AddInterceptor(intercept.Body)
+	p.AddBodyWriteCloser(capture.New(res))
 
-	p.AddWriter(save.Head)
-	p.AddWriter(save.Body)
-	p.AddWriter(save.Response)
+	go func() {
+		for {
+			select {
+			case r := <-res:
+				if _, err := col.Append(r); err != nil {
+					log.Printf("Sqlite: %q\n", err)
+				}
+			}
+		}
+	}()
 
-	// Logs responses to clients.
-	p.AddLogger(logger.Server(os.Stdout))
-
-	log.Printf("Hyperfox tool, by Carlos Reventlov.\n")
+	log.Printf("Hyperfox tool, by José Carlos Nieto.\n")
 	log.Printf("http://www.reventlov.com\n\n")
 
-	if *flagHTTPs == true {
-		// HTTPs
-		err = p.StartTLS(*flagSSLCertFile, *flagSSLKeyFile)
+	if *flagHTTPs {
+		err = p.StartTLS(*flagListen)
 	} else {
-		// Normal HTTP proxy.
-		err = p.Start()
+		err = p.Start(*flagListen)
 	}
 
 	if err != nil {
 		log.Fatalf(ErrBindFailed.Error(), err.Error())
 	}
+
 }

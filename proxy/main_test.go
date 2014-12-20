@@ -44,7 +44,7 @@ type testWriteCloser struct {
 	wc *writeCloser
 }
 
-func (w *testWriteCloser) NewWriteCloser() (io.WriteCloser, error) {
+func (w *testWriteCloser) NewWriteCloser(*http.Response) (io.WriteCloser, error) {
 	w.wc = &writeCloser{}
 	return w.wc, nil
 }
@@ -109,7 +109,7 @@ func (rw *testResponseWriter) WriteHeader(i int) {
 	rw.status = i
 }
 
-func newTextResponseWriter() *testResponseWriter {
+func newTestResponseWriter() *testResponseWriter {
 	rw := &testResponseWriter{
 		header: http.Header{},
 		buf:    bytes.NewBuffer(nil),
@@ -151,7 +151,7 @@ func TestProxyResponse(t *testing.T) {
 	}
 
 	// Creating a response writer.
-	wri := newTextResponseWriter()
+	wri := newTestResponseWriter()
 
 	// Executing request.
 	proxy.ServeHTTP(wri, req)
@@ -181,7 +181,7 @@ func TestDirectorInterface(t *testing.T) {
 	}
 
 	// Creating a response writer.
-	wri := newTextResponseWriter()
+	wri := newTestResponseWriter()
 
 	// Adding a director that will change the request destination to insecure.org
 	proxy.AddDirector(testDirector{})
@@ -204,7 +204,7 @@ func TestInterceptorInterface(t *testing.T) {
 	}
 
 	// Creating a response writer.
-	wri := newTextResponseWriter()
+	wri := newTestResponseWriter()
 
 	// Adding an interceptos that will alter the response status and some texts
 	// from the original page.
@@ -232,7 +232,7 @@ func TestBodyWriteCloserInterface(t *testing.T) {
 	}
 
 	// Creating a response writer.
-	wri := newTextResponseWriter()
+	wri := newTestResponseWriter()
 
 	// Adding write closer that will receive all the data and then a closing
 	// instruction.
@@ -269,7 +269,7 @@ func TestLoggerInterface(t *testing.T) {
 	}
 
 	// Creating a response writer.
-	wri := newTextResponseWriter()
+	wri := newTestResponseWriter()
 
 	// Adding write closer that will receive all the data and then a closing
 	// instruction.
