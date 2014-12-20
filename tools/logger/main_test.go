@@ -23,10 +23,11 @@ package logger
 
 import (
 	"bytes"
-	"github.com/xiam/hyperfox/proxy"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/xiam/hyperfox/proxy"
 )
 
 const listenHTTPAddr = `127.0.0.1:37400`

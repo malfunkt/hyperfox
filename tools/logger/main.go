@@ -24,9 +24,10 @@ package logger
 
 import (
 	"fmt"
-	"github.com/xiam/hyperfox/proxy"
 	"strings"
 	"time"
+
+	"github.com/xiam/hyperfox/proxy"
 )
 
 func chunk(value string) string {

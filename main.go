@@ -24,25 +24,85 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"log"
+	"os"
+
 	"github.com/xiam/hyperfox/proxy"
 	"github.com/xiam/hyperfox/tools/capture"
 	"github.com/xiam/hyperfox/tools/logger"
-	"log"
 	"upper.io/db"
 	"upper.io/db/sqlite"
 )
 
 const (
-	defaultBind = `0.0.0.0:9999`
+	defaultBind              = `0.0.0.0:9999`
+	defaultCaptureCollection = `capture`
+	defaultDatabaseFile      = `hyperfox.db`
 )
+
+const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
+	"id" INTEGER PRIMARY KEY,
+	"remote_addr" VARCHAR(255),
+	"local_addr" VARCHAR(255),
+	"method" VARCHAR(10),
+	"status" INTEGER,
+	"host" VARCHAR(255),
+	"url" TEXT,
+	"header" TEXT,
+	"flagged" INTEGER,
+	"body" BLOB,
+	"date" VARCHAR(20)
+	)`
 
 var (
 	flagListen      = flag.String("l", defaultBind, "Listen on [address]:[port].")
-	flagHTTPs       = flag.Bool("s", false, "Enable HTTPs.")
-	flagSSLCertFile = flag.String("c", "", "Path to SSL certificate file.")
-	flagSSLKeyFile  = flag.String("k", "", "Path to SSL key file.")
-	flagWorkdir     = flag.String("o", "capture", "Working directory.")
+	flagHTTPS       = flag.Bool("s", false, "Enable HTTPs mode (requires -c and -k).")
+	flagSSLCertFile = flag.String("c", "", "Path to root SSL certificate.")
+	flagSSLKeyFile  = flag.String("k", "", "Path to root SSL key.")
 )
+
+var (
+	enableDatabaseSave = false
+)
+
+var sess db.Database
+var col db.Collection
+
+// init sets up the database.
+func init() {
+	var err error
+
+	// Attempt to open database.
+	if sess, err = db.Open(sqlite.Adapter, sqlite.ConnectionURL{Database: defaultDatabaseFile}); err != nil {
+		log.Fatalf(ErrDatabaseConnection.Error(), err)
+	}
+
+	// Collection lookup.
+	col, err = sess.Collection(defaultCaptureCollection)
+
+	if err == nil {
+		// Collection exists! Nothing else to do.
+		return
+	}
+
+	if err != db.ErrCollectionDoesNotExist {
+		// This error is different to a missing collection error.
+		log.Fatalf(ErrDatabaseConnection.Error(), err)
+	}
+
+	// Collection does not exists, let's create it.
+	if drv, ok := sess.Driver().(*sql.DB); ok {
+		// Execute CREATE TABLE.
+		if _, err = drv.Exec(collectionCreateSQL); err != nil {
+			log.Fatalf(ErrDatabaseConnection.Error(), err)
+		}
+		// Try pulling collection again.
+		if col, err = sess.Collection(defaultCaptureCollection); err != nil {
+			log.Fatalf(ErrDatabaseConnection.Error(), err)
+		}
+	}
+
+}
 
 // Parses flags and initializes Hyperfox tool.
 func main() {
@@ -50,87 +110,60 @@ func main() {
 
 	flag.Parse()
 
-	if *flagHTTPs == true {
-		// User wants HTTPs...
+	// User requested SSL mode.
+	if *flagHTTPS {
+
 		if *flagSSLCertFile == "" {
-			// ...but did not provide a certificate.
 			flag.Usage()
-			log.Fatalf(ErrMissingSSLCert.Error())
+			log.Fatal(ErrMissingSSLCert)
 		}
+
 		if *flagSSLKeyFile == "" {
-			// ...but did not provide the certificate key.
 			flag.Usage()
-			log.Fatalf(ErrMissingSSLKey.Error())
+			log.Fatal(ErrMissingSSLKey)
 		}
+
+		os.Setenv(proxy.EnvSSLCert, *flagSSLCertFile)
+		os.Setenv(proxy.EnvSSLKey, *flagSSLKeyFile)
 	}
 
-	var sess db.Database
-
-	if sess, err = db.Open(sqlite.Adapter, sqlite.ConnectionURL{Database: "capture.db"}); err != nil {
-		log.Printf("SQLite: %q\n", err)
-	}
-
-	var col db.Collection
-
-	if col, err = sess.Collection("capture"); err != nil {
-		if err == db.ErrCollectionDoesNotExist {
-			// Create collection.
-			if sqld, ok := sess.Driver().(*sql.DB); ok {
-				_, err := sqld.Exec(`CREATE TABLE "capture" (
-					"id" INTEGER PRIMARY KEY,
-					"remote_addr" VARCHAR(50),
-					"method" VARCHAR(6),
-					"status" INTEGER,
-					"host" VARCHAR(255),
-					"url" TEXT,
-					"header" TEXT,
-					"body" BLOB,
-					"date" VARCHAR(20)
-				)`)
-				if err != nil {
-					log.Printf("SQLite: %q\n", err)
-					return
-				}
-				col, err = sess.Collection("capture")
-				if err != nil {
-					log.Printf("SQLite: %q\n", err)
-					return
-				}
-			}
-			log.Printf("SQLite: %q\n", err)
-		}
-	}
-
+	// Creatig proxy.
 	p := proxy.NewProxy()
 
+	// Attaching logger.
 	p.AddLogger(logger.Stdout{})
 
+	// Attaching capture tool.
 	res := make(chan capture.Response, 256)
 
 	p.AddBodyWriteCloser(capture.New(res))
 
+	// Saving captured data with a goroutine.
 	go func() {
 		for {
 			select {
 			case r := <-res:
 				if _, err := col.Append(r); err != nil {
-					log.Printf("Sqlite: %q\n", err)
+					log.Printf(ErrDatabaseError.Error(), err)
 				}
 			}
 		}
 	}()
 
-	log.Printf("Hyperfox tool, by José Carlos Nieto.\n")
-	log.Printf("http://www.reventlov.com\n\n")
+	// Banner.
+	log.Printf("Hyperfox // http://www.hyperfox.org\n")
+	log.Printf("By José Carlos Nieto.\n\n")
 
-	if *flagHTTPs {
-		err = p.StartTLS(*flagListen)
+	if *flagHTTPS {
+		if err = p.StartTLS(*flagListen); err != nil {
+			log.Fatalf(ErrBindFailed.Error(), err)
+		}
 	} else {
-		err = p.Start(*flagListen)
+		if err = p.Start(*flagListen); err != nil {
+			log.Fatalf(ErrBindFailed.Error(), err)
+		}
 	}
 
-	if err != nil {
-		log.Fatalf(ErrBindFailed.Error(), err.Error())
-	}
-
+	// Closing database.
+	sess.Close()
 }

@@ -24,10 +24,21 @@ package proxy
 
 import (
 	"crypto/tls"
-	"github.com/xiam/hyperfox/util/otf"
 	"io"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/xiam/hyperfox/util/otf"
+)
+
+const (
+	// EnvSSLKey defines the name for the environment variable that holds the
+	// root SSL key.
+	EnvSSLKey = `HYPERFOX_SSL_KEY`
+	// EnvSSLCert defines the name for the environment variable that holds the
+	// root SSL certificate..
+	EnvSSLCert = `HYPERFOX_SSL_CERT`
 )
 
 // BodyWriteCloser interface returns a io.WriteCloser where a copy of the
@@ -266,7 +277,7 @@ func (p *Proxy) Start(addr string) error {
 		Handler: p,
 	}
 
-	log.Printf("Listening for HTTP client requests at %s.\n", addr)
+	log.Printf("Listening for HTTP client requests on %s.\n", addr)
 
 	if err := p.srv.ListenAndServe(); err != nil {
 		return err
@@ -304,12 +315,9 @@ func (p *Proxy) StartTLS(addr string) error {
 		},
 	}
 
-	log.Printf("Listening for HTTPs client requests at %s.\n", addr)
+	log.Printf("Listening for HTTPs client requests on %s.\n", addr)
 
-	cert := "../ssl/rootCA.crt"
-	key := "../ssl/rootCA.key"
-
-	if err := p.srv.ListenAndServeTLS(cert, key); err != nil {
+	if err := p.srv.ListenAndServeTLS(os.Getenv(EnvSSLCert), os.Getenv(EnvSSLKey)); err != nil {
 		return err
 	}
 

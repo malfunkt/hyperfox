@@ -25,8 +25,11 @@ import (
 	"errors"
 )
 
+// Error values.
 var (
-	ErrMissingSSLCert = errors.New(`Missing SSL certificate.`)
-	ErrMissingSSLKey  = errors.New(`Missing SSL certificate key.`)
-	ErrBindFailed     = errors.New(`Failed to bind on the given interface: %s.`)
+	ErrMissingSSLCert     = errors.New(`Missing root SSL certificate`)
+	ErrMissingSSLKey      = errors.New(`Missing root SSL key`)
+	ErrBindFailed         = errors.New(`Failed to bind on the given interface: %q`)
+	ErrDatabaseConnection = errors.New(`Database connection error: %q`)
+	ErrDatabaseError      = errors.New(`Database error: %q`)
 )
