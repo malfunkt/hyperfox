@@ -9,19 +9,25 @@ import (
 )
 
 type Header struct {
-	http.Header
+	http.Header `json:",inline"`
 }
 
 type Response struct {
-	ID         uint      `json:"id" db:",omitempty,json"`
-	RemoteAddr string    `json:"remote_addr" db:",json"`
-	Method     string    `json:"method" db:",json"`
-	Status     int       `json:"status" db:",json"`
-	Host       string    `json:"host" db:",json"`
-	URL        string    `json:"url" db:",json"`
-	Header     Header    `json:"header" db:",json"`
-	Body       []byte    `json:"body" db:",json"`
-	Date       time.Time `json:"date" db:",json"`
+	ID            uint      `json:"id" db:",omitempty,json"`
+	Origin        string    `json:"origin" db:",json"`
+	Method        string    `json:"method" db:",json"`
+	Status        int       `json:"status" db:",json"`
+	ContentType   string    `json:"content_type" db:",json"`
+	ContentLength uint      `json:"content_length" db:",json"`
+	Host          string    `json:"host" db:",json"`
+	URL           string    `json:"url" db:",json"`
+	Scheme        string    `json:"scheme" db:",json"`
+	Path          string    `json:"path" db:",path"`
+	Header        Header    `json:"header,omitempty" db:",json"`
+	Body          []byte    `json:"body,omitempty" db:",json"`
+	DateStart     time.Time `json:"date_start" db:",json"`
+	DateEnd       time.Time `json:"date_end" db:",json"`
+	TimeTaken     int64     `json:"time_taken" db:",json"`
 }
 
 func (h Header) MarshalDB() (interface{}, error) {
@@ -29,8 +35,8 @@ func (h Header) MarshalDB() (interface{}, error) {
 }
 
 func (h *Header) UnmarshalDB(data interface{}) error {
-	if b, ok := data.([]byte); ok {
-		return json.Unmarshal(b, &h.Header)
+	if s, ok := data.(string); ok {
+		return json.Unmarshal([]byte(s), &h.Header)
 	}
 	return nil
 }
@@ -38,20 +44,29 @@ func (h *Header) UnmarshalDB(data interface{}) error {
 type CaptureWriteCloser struct {
 	r *http.Response
 	c chan Response
+	s time.Time
 	bytes.Buffer
 }
 
 func (cwc *CaptureWriteCloser) Close() error {
 
+	now := time.Now()
+
 	r := Response{
-		RemoteAddr: cwc.r.Request.RemoteAddr,
-		Method:     cwc.r.Request.Method,
-		Status:     cwc.r.StatusCode,
-		Host:       cwc.r.Request.URL.Host,
-		URL:        cwc.r.Request.URL.String(),
-		Header:     Header{cwc.r.Request.Header},
-		Body:       cwc.Bytes(),
-		Date:       time.Now(),
+		Origin:        cwc.r.Request.RemoteAddr,
+		Method:        cwc.r.Request.Method,
+		Status:        cwc.r.StatusCode,
+		ContentType:   http.DetectContentType(cwc.Bytes()),
+		ContentLength: uint(cwc.Len()),
+		Host:          cwc.r.Request.URL.Host,
+		URL:           cwc.r.Request.URL.String(),
+		Scheme:        cwc.r.Request.URL.Scheme,
+		Path:          cwc.r.Request.URL.Path,
+		Header:        Header{cwc.r.Request.Header},
+		Body:          cwc.Bytes(),
+		DateStart:     cwc.s,
+		DateEnd:       now,
+		TimeTaken:     now.UnixNano() - cwc.s.UnixNano(),
 	}
 
 	cwc.c <- r
@@ -68,5 +83,5 @@ func New(c chan Response) *Capture {
 }
 
 func (c *Capture) NewWriteCloser(res *http.Response) (io.WriteCloser, error) {
-	return &CaptureWriteCloser{r: res, c: c.c}, nil
+	return &CaptureWriteCloser{r: res, c: c.c, s: time.Now()}, nil
 }

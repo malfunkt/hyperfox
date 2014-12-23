@@ -42,17 +42,21 @@ const (
 
 const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"id" INTEGER PRIMARY KEY,
-	"remote_addr" VARCHAR(255),
-	"local_addr" VARCHAR(255),
+	"origin" VARCHAR(255),
 	"method" VARCHAR(10),
 	"status" INTEGER,
+	"content_type" VARCHAR(50),
+	"content_length" INTEGER,
 	"host" VARCHAR(255),
 	"url" TEXT,
+	"scheme" VARCHAR(10),
+	"path" TEXT,
 	"header" TEXT,
-	"flagged" INTEGER,
 	"body" BLOB,
-	"date" VARCHAR(20)
-	)`
+	"date_start" VARCHAR(20),
+	"date_end" VARCHAR(20),
+	"time_taken" INTEGER
+)`
 
 var (
 	flagListen      = flag.String("l", defaultBind, "Listen on [address]:[port].")
@@ -151,8 +155,12 @@ func main() {
 	}()
 
 	// Banner.
-	log.Printf("Hyperfox // http://www.hyperfox.org\n")
+	log.Printf("Hyperfox // https://www.hyperfox.org\n")
 	log.Printf("By José Carlos Nieto.\n\n")
+
+	if err = startServices(); err != nil {
+		log.Fatal("startServices:", err)
+	}
 
 	if *flagHTTPS {
 		if err = p.StartTLS(*flagListen); err != nil {
