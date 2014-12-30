@@ -1,7 +1,11 @@
 # Hyperfox
 
+## The Hyperfox tool
+
 [Hyperfox][1] is a tool for proxying and recording HTTP and HTTPs
 communications on a LAN.
+
+## The Hyperfox framework
 
 The `github.com/xiam/hyperfox` package is a [Go][2] framework for creating
 custom [man in the middle][3] or traffic interception tools, such as
@@ -28,10 +32,10 @@ to alter the ARP table of the target machine in order to make it redirect its
 traffic to Hyperfox instead of to the legitimate LAN gateway. This is an
 ancient technique known as [ARP spoofing][6].
 
-First, identify both the local IP of the legitimate gateway and the matching
+First, identify both the local IP of the legitimate gateway and its matching
 network interface.
 
-```
+```sh
 > sudo route
 Kernel IP routing table
 Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
@@ -39,24 +43,24 @@ default         10.0.0.1        0.0.0.0         UG    1024   0        0 wlan0
 ...
 ```
 
-The interface in our example is called `wlan0` and the gateway for that
-interface is `10.0.0.1`.
+The interface in our example is called `wlan0` and the interface's gateway is
+`10.0.0.1`.
 
-```
+```sh
 > export HYPERFOX_GW=10.0.0.1
 > export HYPERFOX_IFACE=wlan0
 ```
 
 Then identify the IP address of the target, let's suppose it is `10.0.0.143`.
 
-```
+```sh
 > export HYPERFOX_TARGET=10.0.0.143
 ```
 
 Enable IP forwarding on the host for it to act (temporarily) as a common
 router.
 
-```
+```sh
 > sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
@@ -64,13 +68,13 @@ Issue an `iptables` rule to instruct the host to redirect all traffic that goes
 to port 80 (commonly HTTP) to a local port where Hyperfox is listening to
 (9999).
 
-```
-sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 9999
+```sh
+> sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 9999
 ```
 
 We're almost ready, prepare hyperfox to receive traffic:
 
-```
+```sh
 > hyperfox
 2014/12/30 06:57:22 Hyperfox // https://www.hyperfox.org
 2014/12/30 06:57:22 By José Carlos Nieto.
