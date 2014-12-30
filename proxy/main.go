@@ -23,8 +23,10 @@
 package proxy
 
 import (
+	"bytes"
 	"crypto/tls"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -205,6 +207,13 @@ func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// Intercepting request body.
+	body := bytes.NewBuffer(nil)
+	bodyCopy := bytes.NewBuffer(nil)
+	io.Copy(io.MultiWriter(body, bodyCopy), out.Body)
+
+	out.Body = ioutil.NopCloser(body)
+
 	// Proxying client request to destination server.
 	if pr.Response, err = transport.RoundTrip(out); err != nil {
 		log.Printf("RoundTrip: %q", err)
@@ -213,6 +222,9 @@ func (p *Proxy) ServeHTTP(wri http.ResponseWriter, req *http.Request) {
 	}
 
 	// (Response received).
+
+	// Resetting body (so it can be read later)
+	out.Body = ioutil.NopCloser(bodyCopy)
 
 	// Walking over interceptos.
 	for i := range p.interceptors {

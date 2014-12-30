@@ -25,10 +25,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"path"
 	"regexp"
 	"strconv"
@@ -51,7 +53,8 @@ const (
 )
 
 const (
-	pageSize = uint(50)
+	pageSize         = uint(50)
+	directionRequest = `req`
 )
 
 type getResponse struct {
@@ -89,6 +92,7 @@ func rootHandler(wri http.ResponseWriter, req *http.Request) {
 
 // downloadHandler provides a downloadable document given its ID.
 func downloadHandler(wri http.ResponseWriter, req *http.Request) {
+
 	var err error
 	var response getResponse
 
@@ -97,6 +101,9 @@ func downloadHandler(wri http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	wireFormat := to.Bool(req.Form.Get("wire"))
+	direction := req.Form.Get("type")
+
 	response.ID = uint(to.Int64(req.Form.Get("id")))
 
 	res := col.Find(response)
@@ -104,8 +111,12 @@ func downloadHandler(wri http.ResponseWriter, req *http.Request) {
 	res.Select(
 		"id",
 		"url",
+		"method",
+		"header",
+		"request_header",
+		"date_end",
 		db.Raw{"hex(body) AS body"},
-		"date",
+		db.Raw{"hex(request_body) AS request_body"},
 	)
 
 	if err = res.One(&response.Response); err != nil {
@@ -113,10 +124,85 @@ func downloadHandler(wri http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var buf []byte
-	buf, _ = hex.DecodeString(string(response.Body))
+	var u *url.URL
 
-	http.ServeContent(wri, req, path.Base(response.URL), response.DateEnd, bytes.NewReader(buf))
+	if u, err = url.Parse(response.URL); err != nil {
+		log.Printf("url.Parse: %q", err)
+		return
+	}
+
+	var body []byte
+
+	basename := path.Base(u.Path)
+
+	switch direction {
+	case directionRequest:
+		if body, err = hex.DecodeString(string(response.RequestBody)); err != nil {
+			log.Printf("url.Parse: %q", err)
+			return
+		}
+
+		if wireFormat {
+
+			buf := bytes.NewBuffer(nil)
+
+			buf.WriteString(fmt.Sprintf("%s %s HTTP/1.1\r\n", response.Method, u.RequestURI()))
+
+			for k, vv := range response.RequestHeader.Header {
+				for _, v := range vv {
+					buf.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+				}
+			}
+
+			buf.WriteString("\r\n")
+
+			wri.Header().Set("Content-Disposition", `attachment; filename="`+u.Host+"-"+basename+`.bin"`)
+
+			buf.Write(body)
+
+			http.ServeContent(wri, req, "", response.DateEnd, bytes.NewReader(buf.Bytes()))
+
+		} else {
+
+			wri.Header().Set("Content-Disposition", `attachment; filename="`+basename+`"`)
+
+			http.ServeContent(wri, req, basename, response.DateEnd, bytes.NewReader(body))
+
+		}
+
+	default:
+		if body, err = hex.DecodeString(string(response.Body)); err != nil {
+			log.Printf("url.Parse: %q", err)
+			return
+		}
+
+		if wireFormat {
+
+			buf := bytes.NewBuffer(nil)
+
+			for k, vv := range response.Header.Header {
+				for _, v := range vv {
+					buf.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+				}
+			}
+
+			buf.WriteString("\r\n")
+
+			wri.Header().Set("Content-Disposition", `attachment; filename="`+u.Host+"-"+basename+`.bin"`)
+
+			buf.Write(body)
+
+			http.ServeContent(wri, req, "", response.DateEnd, bytes.NewReader(buf.Bytes()))
+
+		} else {
+
+			wri.Header().Set("Content-Disposition", `attachment; filename="`+basename+`"`)
+
+			http.ServeContent(wri, req, basename, response.DateEnd, bytes.NewReader(body))
+
+		}
+
+	}
 
 	return
 }
@@ -138,12 +224,18 @@ func getHandler(wri http.ResponseWriter, req *http.Request) {
 	res.Select(
 		"id",
 		"method",
-		"remote_addr",
+		"origin",
+		"content_type",
+		"content_length",
 		"status",
 		"host",
 		"url",
+		"scheme",
 		"header",
-		"date",
+		"request_header",
+		"date_start",
+		"date_end",
+		"time_taken",
 	)
 
 	if err = res.One(&response.Response); err != nil {

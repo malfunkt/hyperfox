@@ -42,6 +42,7 @@ const (
 
 const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"id" INTEGER PRIMARY KEY,
+	"direction" VARCHAR(1),
 	"origin" VARCHAR(255),
 	"method" VARCHAR(10),
 	"status" INTEGER,
@@ -53,6 +54,8 @@ const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"path" TEXT,
 	"header" TEXT,
 	"body" BLOB,
+	"request_header" TEXT,
+	"request_body" BLOB,
 	"date_start" VARCHAR(20),
 	"date_end" VARCHAR(20),
 	"time_taken" INTEGER

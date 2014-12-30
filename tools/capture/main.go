@@ -9,7 +9,7 @@ import (
 )
 
 type Header struct {
-	http.Header `json:",inline"`
+	http.Header
 }
 
 type Response struct {
@@ -25,6 +25,8 @@ type Response struct {
 	Path          string    `json:"path" db:",path"`
 	Header        Header    `json:"header,omitempty" db:",json"`
 	Body          []byte    `json:"body,omitempty" db:",json"`
+	RequestHeader Header    `json:"request_header,omitempty" db:",json"`
+	RequestBody   []byte    `json:"request_body,omitempty" db:",json"`
 	DateStart     time.Time `json:"date_start" db:",json"`
 	DateEnd       time.Time `json:"date_end" db:",json"`
 	TimeTaken     int64     `json:"time_taken" db:",json"`
@@ -50,6 +52,10 @@ type CaptureWriteCloser struct {
 
 func (cwc *CaptureWriteCloser) Close() error {
 
+	reqbody := bytes.NewBuffer(nil)
+
+	io.Copy(reqbody, cwc.r.Request.Body)
+
 	now := time.Now()
 
 	r := Response{
@@ -62,8 +68,10 @@ func (cwc *CaptureWriteCloser) Close() error {
 		URL:           cwc.r.Request.URL.String(),
 		Scheme:        cwc.r.Request.URL.Scheme,
 		Path:          cwc.r.Request.URL.Path,
-		Header:        Header{cwc.r.Request.Header},
+		Header:        Header{cwc.r.Header},
 		Body:          cwc.Bytes(),
+		RequestHeader: Header{cwc.r.Request.Header},
+		RequestBody:   reqbody.Bytes(),
 		DateStart:     cwc.s,
 		DateEnd:       now,
 		TimeTaken:     now.UnixNano() - cwc.s.UnixNano(),
