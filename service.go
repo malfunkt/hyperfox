@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"path"
@@ -47,6 +48,10 @@ var (
 const (
 	serviceBindHost      = `127.0.0.1`
 	serviceBindStartPort = 3030
+)
+
+const (
+	pageSize = uint(50)
 )
 
 type getResponse struct {
@@ -77,10 +82,6 @@ func replyJSON(wri http.ResponseWriter, data interface{}) {
 	wri.WriteHeader(http.StatusOK)
 	wri.Write(buf)
 }
-
-const (
-	pageSize = uint(10)
-)
 
 func rootHandler(wri http.ResponseWriter, req *http.Request) {
 
@@ -188,7 +189,7 @@ func pullHandler(wri http.ResponseWriter, req *http.Request) {
 		"url",
 		"content_length",
 		"content_type",
-		"date_end",
+		"date_start",
 		"time_taken",
 	).Sort("id").Limit(pageSize).Skip(pageSize * (response.Page - 1))
 
@@ -221,7 +222,7 @@ func pullHandler(wri http.ResponseWriter, req *http.Request) {
 
 	// Getting total number of pages.
 	if c, err := res.Count(); err == nil {
-		response.Pages = uint(c) / pageSize
+		response.Pages = uint(math.Ceil(float64(c) / float64(pageSize)))
 	}
 
 	replyJSON(wri, response)

