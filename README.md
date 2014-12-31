@@ -3,9 +3,14 @@
 [Hyperfox][1] is a security tool for proxying and recording HTTP and HTTPs
 communications on a LAN.
 
+![Hyperfox diagram](https://hyperfox.org/images/hyperfox-diagram.png)
+
 Hyperfox is capable of forging SSL certificates on the fly using a root CA
-certificate and its corresponding key. If the target machine recognizes the
-root CA as valid, HTTPs traffic could be succesfully intercepted and recorded.
+certificate and its corresponding key (both provided by the user). If the
+target machine recognizes the root CA as trusted, then HTTPs traffic can be
+succesfully intercepted and recorded.
+
+![Hyperfox SSL](https://hyperfox.org/images/hyperfox-diagram.png)
 
 ## Getting Hyperfox
 
