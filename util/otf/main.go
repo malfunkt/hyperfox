@@ -27,14 +27,15 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/tls"
-	"crypto/x509/pkix"
-
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -47,6 +48,10 @@ const (
 var (
 	rootCACert = "../ssl/rootCA.crt"
 	rootCAKey  = "../ssl/rootCA.key"
+)
+
+var (
+	mu sync.Mutex
 )
 
 // SetRootCACert sets the root CA cert.
@@ -62,6 +67,10 @@ func SetRootCAKey(s string) {
 // CreateKeyPair creates a key pair for the given hostname on the fly.
 func CreateKeyPair(hostName string) (certFile string, keyFile string, err error) {
 
+	mu.Lock()
+
+	defer mu.Unlock()
+
 	h := sha1.New()
 	h.Write([]byte(hostName))
 	hostHash := fmt.Sprintf("%x", h.Sum(nil))
@@ -74,6 +83,8 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 		// Keys already in place
 		return
 	}
+
+	log.Printf("Creating SSL certificate for %s...", hostName)
 
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)

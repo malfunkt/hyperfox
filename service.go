@@ -355,7 +355,7 @@ func startServices() error {
 			}
 		}
 
-		log.Printf("See status at http://%s/", addr)
+		log.Printf("Watch live capture at http://live.hyperfox.org/#/?source=%s", addr)
 
 		srv := &http.Server{
 			Addr:    addr,

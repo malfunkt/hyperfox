@@ -24,6 +24,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -35,14 +36,15 @@ import (
 )
 
 const (
-	defaultBind              = `0.0.0.0:9999`
+	defaultAddress           = `0.0.0.0`
+	defaultPort              = uint(1080)
+	defaultSSLPort           = uint(10443)
 	defaultCaptureCollection = `capture`
 	defaultDatabaseFile      = `hyperfox.db`
 )
 
 const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"id" INTEGER PRIMARY KEY,
-	"direction" VARCHAR(1),
 	"origin" VARCHAR(255),
 	"method" VARCHAR(10),
 	"status" INTEGER,
@@ -62,8 +64,9 @@ const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 )`
 
 var (
-	flagListen      = flag.String("l", defaultBind, "Listen on [address]:[port].")
-	flagHTTPS       = flag.Bool("s", false, "Enable HTTPs mode (requires -c and -k).")
+	flagAddress     = flag.String("l", defaultAddress, "Bind address.")
+	flagPort        = flag.Uint("p", defaultPort, "Source port to use.")
+	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Source port to use (SSL).")
 	flagSSLCertFile = flag.String("c", "", "Path to root SSL certificate.")
 	flagSSLKeyFile  = flag.String("k", "", "Path to root SSL key.")
 )
@@ -114,12 +117,19 @@ func init() {
 // Parses flags and initializes Hyperfox tool.
 func main() {
 	var err error
+	var sslEnabled bool
+
+	defer sess.Close()
 
 	flag.Parse()
 
-	// User requested SSL mode.
-	if *flagHTTPS {
+	// SSL is enabled?
+	if *flagSSLPort > 0 && *flagSSLCertFile != "" {
+		sslEnabled = true
+	}
 
+	// User requested SSL mode.
+	if sslEnabled {
 		if *flagSSLCertFile == "" {
 			flag.Usage()
 			log.Fatal(ErrMissingSSLCert)
@@ -165,16 +175,25 @@ func main() {
 		log.Fatal("startServices:", err)
 	}
 
-	if *flagHTTPS {
-		if err = p.StartTLS(*flagListen); err != nil {
-			log.Fatalf(ErrBindFailed.Error(), err)
+	fmt.Println("")
+
+	cerr := make(chan error)
+
+	go func() {
+		if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
+			cerr <- err
 		}
-	} else {
-		if err = p.Start(*flagListen); err != nil {
-			log.Fatalf(ErrBindFailed.Error(), err)
-		}
+	}()
+
+	if sslEnabled {
+		go func() {
+			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
+				cerr <- err
+			}
+		}()
 	}
 
-	// Closing database.
-	sess.Close()
+	err = <-cerr
+
+	log.Fatalf(ErrBindFailed.Error(), err)
 }
