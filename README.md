@@ -12,6 +12,9 @@ succesfully intercepted and recorded.
 
 ![Hyperfox SSL](https://hyperfox.org/images/hyperfox-diagram.png)
 
+This is the development repository, check out the [https://hyperfox.org][1]
+site for usage information.
+
 ## Getting Hyperfox
 
 Install with [Go][1] and [git][5] using `go get`:
@@ -118,8 +121,8 @@ pull request.
 
 [1]: https://hyperfox.org
 [2]: https://golang.org/doc/install
-[3]: http://en.wikipedia.org/wiki/Man-in-the-middle_attack
+[3]: https://en.wikipedia.org/wiki/Man-in-the-middle_attack
 [4]: http://monkey.org/~dugsong/dsniff/
 [5]: http://git-scm.com
-[6]: http://en.wikipedia.org/wiki/ARP_spoofing
+[6]: https://en.wikipedia.org/wiki/ARP_spoofing
 [7]: https://github.com/xiam/hyperfox/issues
