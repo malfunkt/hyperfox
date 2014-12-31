@@ -1,15 +1,11 @@
 # Hyperfox
 
-## The Hyperfox tool
-
-[Hyperfox][1] is a tool for proxying and recording HTTP and HTTPs
+[Hyperfox][1] is a security tool for proxying and recording HTTP and HTTPs
 communications on a LAN.
 
-## The Hyperfox framework
-
-The `github.com/xiam/hyperfox` package is a [Go][2] framework for creating
-custom [man in the middle][3] or traffic interception tools, such as
-[Hyperfox][1].
+Hyperfox is capable of forging SSL certificates on the fly using a root CA
+certificate and its corresponding key. If the target machine recognizes the
+root CA as valid, HTTPs traffic could be succesfully intercepted and recorded.
 
 ## Getting Hyperfox
 
@@ -66,21 +62,18 @@ router.
 
 Issue an `iptables` rule to instruct the host to redirect all traffic that goes
 to port 80 (commonly HTTP) to a local port where Hyperfox is listening to
-(9999).
+(1080).
 
 ```sh
-> sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 9999
+> sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 1080
 ```
 
-We're almost ready, prepare hyperfox to receive traffic:
+We're almost ready, prepare hyperfox to receive plain HTTP traffic:
 
 ```sh
 > hyperfox
-2014/12/30 06:57:22 Hyperfox // https://www.hyperfox.org
-2014/12/30 06:57:22 By José Carlos Nieto.
-
-2014/12/30 06:57:22 See status at http://127.0.0.1:3030/
-2014/12/30 06:57:22 Listening for HTTP client requests on 0.0.0.0:9999.
+...
+2014/12/31 07:53:29 Listening for incoming HTTP client requests on 0.0.0.0:1080.
 ```
 
 Finally, run `arpspoof` to alter the target's ARP table so it starts sending
