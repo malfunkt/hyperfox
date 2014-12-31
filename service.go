@@ -341,6 +341,8 @@ func startServices() error {
 		var addr string
 		var ln net.Listener
 
+		log.Printf("Starting (local) API server...")
+
 		// Looking for a port to listen to.
 		for i := 0; i < 65535; i++ {
 			addr = serviceBindHost + ":" + strconv.Itoa(serviceBindStartPort+i)

@@ -35,12 +35,14 @@ import (
 	"upper.io/db/sqlite"
 )
 
+const version = "0.9"
+
 const (
 	defaultAddress           = `0.0.0.0`
 	defaultPort              = uint(1080)
 	defaultSSLPort           = uint(10443)
 	defaultCaptureCollection = `capture`
-	defaultDatabaseFile      = `hyperfox.db`
+	defaultDatabase          = `hyperfox-%05d.db`
 )
 
 const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
@@ -64,26 +66,45 @@ const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 )`
 
 var (
+	flagDatabase    = flag.String("d", "", "Path to database.")
 	flagAddress     = flag.String("l", defaultAddress, "Bind address.")
-	flagPort        = flag.Uint("p", defaultPort, "Source port to use.")
-	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Source port to use (SSL).")
-	flagSSLCertFile = flag.String("c", "", "Path to root SSL certificate.")
-	flagSSLKeyFile  = flag.String("k", "", "Path to root SSL key.")
+	flagPort        = flag.Uint("p", defaultPort, "Port to bind to.")
+	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Port to bind to (SSL mode).")
+	flagSSLCertFile = flag.String("c", "", "Path to root CA certificate.")
+	flagSSLKeyFile  = flag.String("k", "", "Path to root CA key.")
 )
 
 var (
 	enableDatabaseSave = false
 )
 
-var sess db.Database
-var col db.Collection
+var (
+	sess db.Database
+	col  db.Collection
+)
 
-// init sets up the database.
-func init() {
+// dbsetup sets up the database.
+func dbsetup() error {
 	var err error
+	var databaseName string
 
-	// Attempt to open database.
-	if sess, err = db.Open(sqlite.Adapter, sqlite.ConnectionURL{Database: defaultDatabaseFile}); err != nil {
+	if *flagDatabase == "" {
+		// Let's find an unused database file.
+		for i := 0; ; i++ {
+			databaseName = fmt.Sprintf(defaultDatabase, i)
+			if _, err := os.Stat(databaseName); err != nil {
+				// File does not exists (yet).
+				// And that's OK.
+				break
+			}
+		}
+	} else {
+		// Use the provided database name.
+		databaseName = *flagDatabase
+	}
+
+	// Attempting to open database.
+	if sess, err = db.Open(sqlite.Adapter, sqlite.ConnectionURL{Database: databaseName}); err != nil {
 		log.Fatalf(ErrDatabaseConnection.Error(), err)
 	}
 
@@ -92,8 +113,11 @@ func init() {
 
 	if err == nil {
 		// Collection exists! Nothing else to do.
-		return
+		log.Printf("Using database %s.", databaseName)
+		return nil
 	}
+
+	log.Printf("Initializing database %s...", databaseName)
 
 	if err != db.ErrCollectionDoesNotExist {
 		// This error is different to a missing collection error.
@@ -112,6 +136,7 @@ func init() {
 		}
 	}
 
+	return nil
 }
 
 // Parses flags and initializes Hyperfox tool.
@@ -119,11 +144,21 @@ func main() {
 	var err error
 	var sslEnabled bool
 
-	defer sess.Close()
+	// Banner.
+	log.Printf("Hyperfox v%s // https://hyperfox.org\n", version)
+	log.Printf("By José Carlos Nieto.\n\n")
 
+	// Parsing command line flags.
 	flag.Parse()
 
-	// SSL is enabled?
+	// Opening database.
+	if err = dbsetup(); err != nil {
+		log.Fatalf("db: %q", err)
+	}
+
+	defer sess.Close()
+
+	// Is SSL enabled?
 	if *flagSSLPort > 0 && *flagSSLCertFile != "" {
 		sslEnabled = true
 	}
@@ -167,10 +202,6 @@ func main() {
 		}
 	}()
 
-	// Banner.
-	log.Printf("Hyperfox // https://www.hyperfox.org\n")
-	log.Printf("By José Carlos Nieto.\n\n")
-
 	if err = startServices(); err != nil {
 		log.Fatal("startServices:", err)
 	}
@@ -178,6 +209,8 @@ func main() {
 	fmt.Println("")
 
 	cerr := make(chan error)
+
+	// Starting proxy servers.
 
 	go func() {
 		if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {

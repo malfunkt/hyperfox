@@ -289,7 +289,7 @@ func (p *Proxy) Start(addr string) error {
 		Handler: p,
 	}
 
-	log.Printf("Listening for HTTP client requests on %s.\n", addr)
+	log.Printf("Listening for incoming HTTP client requests on %s.\n", addr)
 
 	if err := p.srv.ListenAndServe(); err != nil {
 		return err
@@ -327,7 +327,7 @@ func (p *Proxy) StartTLS(addr string) error {
 		},
 	}
 
-	log.Printf("Listening for HTTPs client requests on %s.\n", addr)
+	log.Printf("Listening for incoming HTTPs client requests on %s.\n", addr)
 
 	otf.SetRootCACert(os.Getenv(EnvSSLCert))
 	otf.SetRootCAKey(os.Getenv(EnvSSLKey))
