@@ -17,15 +17,10 @@ site for usage information.
 
 ## Getting Hyperfox
 
-Install with [Go][1] and [git][5] using `go get`:
+See the [download](https://hyperfox.org/download) page for binary builds and
+compilation instructions.
 
-```sh
-> go get github.com/xiam/hyperfox
-```
-
-Precompiled packages may also be available at the [hyperfox.org][1] site.
-
-## A common example: hyperfox with arpspoof
+## A common example: hyperfox with arpspoof on Linux
 
 The following example assumes that hyperfox is installed on a Linux box (host)
 on which you have root access or sudo privileges and that the target machine is
