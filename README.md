@@ -8,7 +8,7 @@ communications on a LAN.
 Hyperfox is capable of forging SSL certificates on the fly using a root CA
 certificate and its corresponding key (both provided by the user). If the
 target machine recognizes the root CA as trusted, then HTTPs traffic can be
-succesfully intercepted and recorded.
+successfully intercepted and recorded.
 
 ![Hyperfox SSL](https://hyperfox.org/images/hyperfox-diagram.png)
 
