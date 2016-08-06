@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Carlos Nieto, https://menteslibres.net/xiam
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -19,24 +19,25 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// Package otf provides SSL certificates on the fly.
-package otf
+// Package gencert generates SSL certificates for any host on the fly.
+package gencert
 
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/idna"
 )
 
 const (
@@ -46,8 +47,8 @@ const (
 )
 
 var (
-	rootCACert = "../ssl/rootCA.crt"
-	rootCAKey  = "../ssl/rootCA.key"
+	rootCACert = "../../ssl/rootCA.crt"
+	rootCAKey  = "../../ssl/rootCA.key"
 )
 
 var (
@@ -65,18 +66,21 @@ func SetRootCAKey(s string) {
 }
 
 // CreateKeyPair creates a key pair for the given hostname on the fly.
-func CreateKeyPair(hostName string) (certFile string, keyFile string, err error) {
-
+func CreateKeyPair(commonName string) (certFile string, keyFile string, err error) {
 	mu.Lock()
-
 	defer mu.Unlock()
 
-	h := sha1.New()
-	h.Write([]byte(hostName))
-	hostHash := fmt.Sprintf("%x", h.Sum(nil))
+	commonName, err = idna.ToASCII(commonName)
+	if err != nil {
+		return
+	}
 
-	certFile = certDirectory + pathSeparator + hostHash + ".crt"
-	keyFile = certDirectory + pathSeparator + hostHash + ".key"
+	commonName = strings.ToLower(commonName)
+
+	destDir := certDirectory + pathSeparator + commonName + pathSeparator
+
+	certFile = destDir + "cert.pem"
+	keyFile = destDir + "key.pem"
 
 	// Attempt to verify certs.
 	if _, err = tls.LoadX509KeyPair(certFile, keyFile); err == nil {
@@ -84,24 +88,22 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 		return
 	}
 
-	log.Printf("Creating SSL certificate for %s...", hostName)
+	log.Printf("Creating SSL certificate for %s...", commonName)
 
-	notBefore := time.Now()
+	notBefore := time.Now().Add(-24 * 30 * time.Hour)
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
-	var serialNumber *big.Int
-
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-
-	if serialNumber, err = rand.Int(rand.Reader, serialNumberLimit); err != nil {
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
 		return
 	}
 
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Acme Co"},
-			CommonName:   hostName,
+			Organization: []string{"Hyperfox Fake Certificates, Inc"},
+			CommonName:   commonName,
 		},
 		NotBefore:   notBefore,
 		NotAfter:    notAfter,
@@ -109,15 +111,14 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 
-	if ip := net.ParseIP(hostName); ip != nil {
+	if ip := net.ParseIP(commonName); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
-		template.DNSNames = append(template.DNSNames, hostName)
+		template.DNSNames = append(template.DNSNames, commonName)
 	}
 
-	var rootCA tls.Certificate
-
-	if rootCA, err = tls.LoadX509KeyPair(rootCACert, rootCAKey); err != nil {
+	rootCA, err := tls.LoadX509KeyPair(rootCACert, rootCAKey)
+	if err != nil {
 		return
 	}
 
@@ -126,23 +127,20 @@ func CreateKeyPair(hostName string) (certFile string, keyFile string, err error)
 	}
 
 	var priv *rsa.PrivateKey
-
 	if priv, err = rsa.GenerateKey(rand.Reader, rsaBits); err != nil {
 		return
 	}
 
 	var derBytes []byte
-
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &template, rootCA.Leaf, &priv.PublicKey, rootCA.PrivateKey); err != nil {
 		return
 	}
 
-	if err = os.MkdirAll(certDirectory, 0755); err != nil {
+	if err = os.MkdirAll(destDir, 0755); err != nil {
 		return
 	}
 
 	certOut, err := os.Create(certFile)
-
 	if err != nil {
 		return
 	}
