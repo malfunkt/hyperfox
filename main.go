@@ -22,48 +22,25 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/xiam/hyperfox/proxy"
 	"github.com/xiam/hyperfox/tools/capture"
 	"github.com/xiam/hyperfox/tools/logger"
-	"upper.io/db"
-	"upper.io/db/sqlite"
+	"upper.io/db.v2"
 )
 
-const version = "0.9"
+const version = "1.0"
 
 const (
-	defaultAddress           = `0.0.0.0`
-	defaultPort              = uint(1080)
-	defaultSSLPort           = uint(10443)
-	defaultCaptureCollection = `capture`
-	defaultDatabase          = `hyperfox-%05d.db`
+	defaultAddress = `0.0.0.0`
+	defaultPort    = uint(1080)
+	defaultSSLPort = uint(10443)
 )
-
-const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
-	"id" INTEGER PRIMARY KEY,
-	"origin" VARCHAR(255),
-	"method" VARCHAR(10),
-	"status" INTEGER,
-	"content_type" VARCHAR(50),
-	"content_length" INTEGER,
-	"host" VARCHAR(255),
-	"url" TEXT,
-	"scheme" VARCHAR(10),
-	"path" TEXT,
-	"header" TEXT,
-	"body" BLOB,
-	"request_header" TEXT,
-	"request_body" BLOB,
-	"date_start" VARCHAR(20),
-	"date_end" VARCHAR(20),
-	"time_taken" INTEGER
-)`
 
 var (
 	flagDatabase    = flag.String("d", "", "Path to database.")
@@ -75,75 +52,11 @@ var (
 )
 
 var (
-	enableDatabaseSave = false
+	sess    db.Database
+	storage db.Collection
 )
 
-var (
-	sess db.Database
-	col  db.Collection
-)
-
-// dbsetup sets up the database.
-func dbsetup() error {
-	var err error
-	var databaseName string
-
-	if *flagDatabase == "" {
-		// Let's find an unused database file.
-		for i := 0; ; i++ {
-			databaseName = fmt.Sprintf(defaultDatabase, i)
-			if _, err := os.Stat(databaseName); err != nil {
-				// File does not exists (yet).
-				// And that's OK.
-				break
-			}
-		}
-	} else {
-		// Use the provided database name.
-		databaseName = *flagDatabase
-	}
-
-	// Attempting to open database.
-	if sess, err = db.Open(sqlite.Adapter, sqlite.ConnectionURL{Database: databaseName}); err != nil {
-		log.Fatalf(ErrDatabaseConnection.Error(), err)
-	}
-
-	// Collection lookup.
-	col, err = sess.Collection(defaultCaptureCollection)
-
-	if err == nil {
-		// Collection exists! Nothing else to do.
-		log.Printf("Using database %s.", databaseName)
-		return nil
-	}
-
-	log.Printf("Initializing database %s...", databaseName)
-
-	if err != db.ErrCollectionDoesNotExist {
-		// This error is different to a missing collection error.
-		log.Fatalf(ErrDatabaseConnection.Error(), err)
-	}
-
-	// Collection does not exists, let's create it.
-	if drv, ok := sess.Driver().(*sql.DB); ok {
-		// Execute CREATE TABLE.
-		if _, err = drv.Exec(collectionCreateSQL); err != nil {
-			log.Fatalf(ErrDatabaseConnection.Error(), err)
-		}
-		// Try pulling collection again.
-		if col, err = sess.Collection(defaultCaptureCollection); err != nil {
-			log.Fatalf(ErrDatabaseConnection.Error(), err)
-		}
-	}
-
-	return nil
-}
-
-// Parses flags and initializes Hyperfox tool.
 func main() {
-	var err error
-	var sslEnabled bool
-
 	// Banner.
 	log.Printf("Hyperfox v%s // https://hyperfox.org\n", version)
 	log.Printf("By José Carlos Nieto.\n\n")
@@ -152,13 +65,20 @@ func main() {
 	flag.Parse()
 
 	// Opening database.
-	if err = dbsetup(); err != nil {
-		log.Fatalf("db: %q", err)
+	var err error
+	sess, err = dbInit()
+	if err != nil {
+		log.Fatal("Failed to setup database: ", err)
 	}
-
 	defer sess.Close()
 
+	storage = sess.Collection(defaultCaptureCollection)
+	if !storage.Exists() {
+		log.Fatal("Storage table does not exist")
+	}
+
 	// Is SSL enabled?
+	var sslEnabled bool
 	if *flagSSLPort > 0 && *flagSSLCertFile != "" {
 		sslEnabled = true
 	}
@@ -167,12 +87,12 @@ func main() {
 	if sslEnabled {
 		if *flagSSLCertFile == "" {
 			flag.Usage()
-			log.Fatal(ErrMissingSSLCert)
+			log.Fatal("Missing root CA certificate")
 		}
 
 		if *flagSSLKeyFile == "" {
 			flag.Usage()
-			log.Fatal(ErrMissingSSLKey)
+			log.Fatal("Missing root CA private key")
 		}
 
 		os.Setenv(proxy.EnvSSLCert, *flagSSLCertFile)
@@ -195,9 +115,11 @@ func main() {
 		for {
 			select {
 			case r := <-res:
-				if _, err := col.Append(r); err != nil {
-					log.Printf(ErrDatabaseError.Error(), err)
-				}
+				go func() {
+					if _, err := storage.Insert(r); err != nil {
+						log.Printf("Failed to save to database: %s", err)
+					}
+				}()
 			}
 		}
 	}()
@@ -208,25 +130,26 @@ func main() {
 
 	fmt.Println("")
 
-	cerr := make(chan error)
+	var wg sync.WaitGroup
 
 	// Starting proxy servers.
-
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-			cerr <- err
+			log.Fatalf("Failed to bind on the given interface (HTTP): ", err)
 		}
 	}()
 
 	if sslEnabled {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
-				cerr <- err
+				log.Fatalf("Failed to bind on the given interface (HTTPS): ", err)
 			}
 		}()
 	}
 
-	err = <-cerr
-
-	log.Fatalf(ErrBindFailed.Error(), err)
+	wg.Wait()
 }

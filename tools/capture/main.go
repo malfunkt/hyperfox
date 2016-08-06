@@ -13,23 +13,23 @@ type Header struct {
 }
 
 type Response struct {
-	ID            uint      `json:"id" db:",omitempty,json"`
-	Origin        string    `json:"origin" db:",json"`
-	Method        string    `json:"method" db:",json"`
-	Status        int       `json:"status" db:",json"`
-	ContentType   string    `json:"content_type" db:",json"`
-	ContentLength uint      `json:"content_length" db:",json"`
-	Host          string    `json:"host" db:",json"`
-	URL           string    `json:"url" db:",json"`
-	Scheme        string    `json:"scheme" db:",json"`
-	Path          string    `json:"path" db:",path"`
-	Header        Header    `json:"header,omitempty" db:",json"`
-	Body          []byte    `json:"body,omitempty" db:",json"`
-	RequestHeader Header    `json:"request_header,omitempty" db:",json"`
-	RequestBody   []byte    `json:"request_body,omitempty" db:",json"`
-	DateStart     time.Time `json:"date_start" db:",json"`
-	DateEnd       time.Time `json:"date_end" db:",json"`
-	TimeTaken     int64     `json:"time_taken" db:",json"`
+	ID            uint      `json:"id" db:"id,omitempty"`
+	Origin        string    `json:"origin" db:"origin"`
+	Method        string    `json:"method" db:"method"`
+	Status        int       `json:"status" db:"status"`
+	ContentType   string    `json:"content_type" db:"content_type"`
+	ContentLength uint      `json:"content_length" db:"content_length"`
+	Host          string    `json:"host" db:"host"`
+	URL           string    `json:"url" db:"url"`
+	Scheme        string    `json:"scheme" db:"scheme"`
+	Path          string    `json:"path" db:"path"`
+	Header        Header    `json:"header,omitempty" db:"header"`
+	Body          []byte    `json:"body,omitempty" db:"body"`
+	RequestHeader Header    `json:"request_header,omitempty" db:"request_header"`
+	RequestBody   []byte    `json:"request_body,omitempty" db:"request_body"`
+	DateStart     time.Time `json:"date_start" db:"date_start"`
+	DateEnd       time.Time `json:"date_end" db:"date_end"`
+	TimeTaken     int64     `json:"time_taken" db:"time_taken"`
 }
 
 func (h Header) MarshalDB() (interface{}, error) {

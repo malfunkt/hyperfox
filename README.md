@@ -5,8 +5,8 @@ communications on a LAN.
 
 ![Hyperfox diagram](https://hyperfox.org/images/hyperfox-diagram.png)
 
-Hyperfox is capable of forging SSL certificates on the fly using a root CA
-certificate and its corresponding key (both provided by the user). If the
+Hyperfox is capable of forging SSL certificates on the fly using a custom root
+CA certificate and its corresponding key (both provided by the user). If the
 target machine recognizes the root CA as trusted, then HTTPs traffic can be
 successfully intercepted and recorded.
 
@@ -22,14 +22,14 @@ compilation instructions.
 
 ## A common example: hyperfox with arpspoof on Linux
 
-The following example assumes that hyperfox is installed on a Linux box (host)
+The following example assumes that Hyperfox is installed on a Linux box (host)
 on which you have root access or sudo privileges and that the target machine is
 connected on the same LAN as the host.
 
-We are going to use the `arpspoof` tool that is part of the [dsniff][4] suite
-to alter the ARP table of the target machine in order to make it redirect its
-traffic to Hyperfox instead of to the legitimate LAN gateway. This is an
-ancient technique known as [ARP spoofing][6].
+We are going to use the `arpspoof` tool, which is part of the [dsniff][4]
+suite, to alter the ARP table of the target machine in order to make it
+redirect its traffic to Hyperfox instead of to the legitimate LAN gateway. This
+is an ancient technique known as [ARP spoofing][6].
 
 First, identify both the local IP of the legitimate gateway and its matching
 network interface.
@@ -63,15 +63,15 @@ router.
 > sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
-Issue an `iptables` rule to instruct the host to redirect all traffic that goes
-to port 80 (commonly HTTP) to a local port where Hyperfox is listening to
-(1080).
+Issue an `iptables` rule on the host to instruct it to redirect all traffic
+that goes to port 80 (commonly HTTP) to a local port where Hyperfox is
+listening to (1080).
 
 ```sh
 > sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 1080
 ```
 
-We're almost ready, prepare hyperfox to receive plain HTTP traffic:
+We're almost ready, prepare Hyperfox to receive plain HTTP traffic:
 
 ```sh
 > hyperfox
@@ -86,14 +86,16 @@ its network traffic to the host box.
 > sudo arpspoof -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
 ```
 
-## Contributing to Hyperfox development
+And watch the live traffic coming in.
+
+## Contributing to Hyperfox
 
 Sure, there's a lot of opportunity. Choose an [issue][7], fix it and send a
 pull request.
 
 ## License
 
-> Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+> Copyright (c) 2012-today José Carlos Nieto, https://menteslibres.net/xiam
 >
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the
