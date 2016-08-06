@@ -19,7 +19,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-package capture
+package logger
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xiam/hyperfox/proxy"
+	"github.com/xiam/hyperfox/lib/proxy"
 )
 
 const listenHTTPAddr = `127.0.0.1:37400`
@@ -72,11 +72,13 @@ func TestListenHTTP(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 }
 
-func TestWriteCloser(t *testing.T) {
+func TestLoggerInterface(t *testing.T) {
 	var req *http.Request
 	var err error
 
-	px.AddBodyWriteCloser(Capture{})
+	// Adding write closer that will receive all the data and then a closing
+	// instruction.
+	px.AddLogger(Stdout{})
 
 	urls := []string{
 		"http://golang.org/src/database/sql/",
@@ -86,7 +88,6 @@ func TestWriteCloser(t *testing.T) {
 	}
 
 	for i := range urls {
-
 		// Creating a response writer.
 		wri := newTestResponseWriter()
 

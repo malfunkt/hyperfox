@@ -51,13 +51,14 @@ type CaptureWriteCloser struct {
 }
 
 func (cwc *CaptureWriteCloser) Close() error {
-
 	reqbody := bytes.NewBuffer(nil)
 
-	io.Copy(reqbody, cwc.r.Request.Body)
+	if cwc.r.Request.Body != nil {
+		io.Copy(reqbody, cwc.r.Request.Body)
+		cwc.r.Request.Body.Close()
+	}
 
 	now := time.Now()
-
 	r := Response{
 		Origin:        cwc.r.Request.RemoteAddr,
 		Method:        cwc.r.Request.Method,
