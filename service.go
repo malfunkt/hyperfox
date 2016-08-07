@@ -36,7 +36,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/xiam/hyperfox/tools/capture"
+	"github.com/xiam/hyperfox/lib/plugins/capture"
 	"menteslibres.net/gosexy/to"
 	"upper.io/db.v2"
 )

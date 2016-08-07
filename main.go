@@ -28,9 +28,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/xiam/hyperfox/proxy"
-	"github.com/xiam/hyperfox/tools/capture"
-	"github.com/xiam/hyperfox/tools/logger"
+	"github.com/xiam/hyperfox/lib/plugins/capture"
+	"github.com/xiam/hyperfox/lib/plugins/logger"
+	"github.com/xiam/hyperfox/lib/proxy"
 	"upper.io/db.v2"
 )
 
