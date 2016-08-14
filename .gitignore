@@ -2,3 +2,4 @@
 *.db
 hyperfox
 certs/
+bin/
