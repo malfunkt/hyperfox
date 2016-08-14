@@ -8,8 +8,8 @@ GH_RELEASE_MESSAGE  ?= Latest release.
 
 all: build
 
-build: docker-builder clean
-	@mkdir -p $(BUILD_OUTPUT_DIR) && \
+build: vendor-sync docker-builder clean
+	mkdir -p $(BUILD_OUTPUT_DIR) && \
 	docker run \
 		-v $$PWD:/app/src/$(BUILD_PATH) \
 		-e CGO_ENABLED=1 -e GOOS=windows -e GOARCH=amd64 -e CC=x86_64-w64-mingw32-gcc \
@@ -42,6 +42,9 @@ docker-builder:
 	(docker stop $(DOCKER_CONTAINER) || exit 0) && \
 	docker build -t $(DOCKER_CONTAINER) .
 
+vendor-sync:
+	govendor sync
+
 clean:
-	@rm -f *.db && \
+	rm -f *.db && \
 	rm -rf $(BUILD_OUTPUT_DIR)
