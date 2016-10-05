@@ -17,7 +17,7 @@ site for usage information.
 
 ## Get `hyperfox`
 
-You can install arpfox to `/usr/local/bin` with the following command (requires
+You can install hyperfox to `/usr/local/bin` with the following command (requires
 admin privileges):
 
 ```
@@ -30,7 +30,7 @@ another location.
 
 ## Build it yourself
 
-In order to build `arpfox` you'll need Go and a C compiler:
+In order to build `hyperfox` you'll need Go and a C compiler:
 
 ```
 go install github.com/malfunkt/hyperfox
