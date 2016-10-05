@@ -15,10 +15,26 @@ decrypted, intercepted and recorded.
 This is the development repository, check out the [https://hyperfox.org][1]
 site for usage information.
 
-## Getting Hyperfox
+## Get `hyperfox`
 
-See the [download](https://hyperfox.org/download) page for binary builds and
-compilation instructions.
+You can install arpfox to `/usr/local/bin` with the following command (requires
+admin privileges):
+
+```
+curl -sL 'https://raw.githubusercontent.com/malfunkt/hyperfox/master/install.sh' | sh
+```
+
+You can also grab the latest release from our [releases
+page](https://github.com/malfunkt/hyperfox/releases) and install it manually into
+another location.
+
+## Build it yourself
+
+In order to build `arpfox` you'll need Go and a C compiler:
+
+```
+go install github.com/malfunkt/hyperfox
+```
 
 ## A common example: hyperfox with arpfox on Linux
 
