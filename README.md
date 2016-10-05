@@ -20,7 +20,7 @@ site for usage information.
 You can install hyperfox to `/usr/local/bin` with the following command (requires
 admin privileges):
 
-```
+```sh
 curl -sL 'https://raw.githubusercontent.com/malfunkt/hyperfox/master/install.sh' | sh
 ```
 
@@ -32,11 +32,11 @@ another location.
 
 In order to build `hyperfox` you'll need Go and a C compiler:
 
-```
+```sh
 go install github.com/malfunkt/hyperfox
 ```
 
-## A common example: hyperfox with arpfox on Linux
+## Running hyperfox and arpfox on Linux
 
 The following example assumes that Hyperfox is installed on a Linux box (host)
 on which you have root access or sudo privileges and that the target machine is
@@ -51,32 +51,32 @@ First, identify both the local IP of the legitimate gateway and its matching
 network interface.
 
 ```sh
-> sudo route
-Kernel IP routing table
-Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-default         10.0.0.1        0.0.0.0         UG    1024   0        0 wlan0
-...
+sudo route
+# Kernel IP routing table
+# Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+# default         10.0.0.1        0.0.0.0         UG    1024   0        0 wlan0
+# ...
 ```
 
 The interface in our example is called `wlan0` and the interface's gateway is
 `10.0.0.1`.
 
 ```sh
-> export HYPERFOX_GW=10.0.0.1
-> export HYPERFOX_IFACE=wlan0
+export HYPERFOX_GW=10.0.0.1
+export HYPERFOX_IFACE=wlan0
 ```
 
 Then identify the IP address of the target, let's suppose it is `10.0.0.143`.
 
 ```sh
-> export HYPERFOX_TARGET=10.0.0.143
+export HYPERFOX_TARGET=10.0.0.143
 ```
 
 Enable IP forwarding on the host for it to act (temporarily) as a common
 router.
 
 ```sh
-> sudo sysctl -w net.ipv4.ip_forward=1
+sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
 Issue an `iptables` rule on the host to instruct it to redirect all traffic
@@ -84,22 +84,22 @@ that goes to port 80 (commonly HTTP) to a local port where Hyperfox is
 listening to (1080).
 
 ```sh
-> sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 1080
+sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 1080
 ```
 
 We're almost ready, prepare Hyperfox to receive plain HTTP traffic:
 
 ```sh
-> hyperfox
-...
-2014/12/31 07:53:29 Listening for incoming HTTP client requests on 0.0.0.0:1080.
+hyperfox
+# ...
+# 2014/12/31 07:53:29 Listening for incoming HTTP client requests on 0.0.0.0:1080.
 ```
 
 Finally, run `arpfox` to alter the target's ARP table so it starts sending its
 network traffic to the host box:
 
 ```sh
-> sudo arpfox -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
+sudo arpfox -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
 ```
 
 and watch the live traffic coming in.
