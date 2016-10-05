@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xiam/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/lib/proxy"
 )
 
 const listenHTTPAddr = `127.0.0.1:37400`

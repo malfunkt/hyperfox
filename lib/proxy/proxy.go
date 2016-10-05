@@ -31,7 +31,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/xiam/hyperfox/lib/gencert"
+	"github.com/malfunkt/hyperfox/lib/gencert"
 )
 
 const (

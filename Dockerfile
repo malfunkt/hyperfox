@@ -18,15 +18,29 @@ RUN dnf install -y mingw32-gcc.x86_64 mingw64-gcc.x86_64 && dnf clean packages
 
 RUN dnf install -y tar git mercurial && dnf clean packages
 
-RUN curl 'https://storage.googleapis.com/golang/go1.6.3.linux-amd64.tar.gz' | tar -xvzf - -C /usr/local
+RUN mkdir -p /app
 
-RUN mkdir -p /app 
+ENV GO_TARBALL=https://storage.googleapis.com/golang/go1.7.1.linux-amd64.tar.gz
+RUN curl $GO_TARBALL | tar -xvzf - -C /usr/local
 
 ENV GOROOT /usr/local/go
 ENV GOPATH /app
 ENV PATH $PATH:$GOROOT/bin:$GOPATH/bin
-RUN go get -u github.com/kardianos/govendor
 
-RUN mkdir -p /app/src/github.com/xiam/hyperfox
+RUN go get github.com/mattn/go-sqlite3
 
-WORKDIR /app/src/github.com/xiam/hyperfox
+RUN CC=x86_64-w64-mingw32-gcc \
+	CGO_ENABLED=1 \
+	GOOS=windows \
+	GOARCH=amd64 \
+	go install github.com/mattn/go-sqlite3
+
+RUN CC=i686-w64-mingw32-gcc \
+	CGO_ENABLED=1 \
+	GOOS=windows \
+	GOARCH=386 \
+	go install github.com/mattn/go-sqlite3
+
+RUN mkdir -p /app/src/github.com/malfunkt/hyperfox
+
+WORKDIR /app/src/github.com/malfunkt/hyperfox

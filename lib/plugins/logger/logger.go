@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xiam/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/lib/proxy"
 )
 
 func chunk(value string) string {

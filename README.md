@@ -5,10 +5,10 @@ communications on a LAN.
 
 ![Hyperfox diagram](https://hyperfox.org/images/hyperfox-diagram.png)
 
-Hyperfox is capable of forging SSL certificates on the fly using a custom root
-CA certificate and its corresponding key (both provided by the user). If the
-target machine recognizes the root CA as trusted, then HTTPs traffic can be
-successfully intercepted and recorded.
+Hyperfox is capable of forging SSL certificates on the fly if you provide it
+with a root CA certificate and its corresponding key. If the target machine
+recognizes the root CA as trusted, then HTTPs traffic can be successfully
+decrypted, intercepted and recorded.
 
 ![Hyperfox SSL](https://hyperfox.org/images/hyperfox-diagram.png)
 
@@ -20,16 +20,16 @@ site for usage information.
 See the [download](https://hyperfox.org/download) page for binary builds and
 compilation instructions.
 
-## A common example: hyperfox with arpspoof on Linux
+## A common example: hyperfox with arpfox on Linux
 
 The following example assumes that Hyperfox is installed on a Linux box (host)
 on which you have root access or sudo privileges and that the target machine is
 connected on the same LAN as the host.
 
-We are going to use the `arpspoof` tool, which is part of the [dsniff][4]
-suite, to alter the ARP table of the target machine in order to make it
-redirect its traffic to Hyperfox instead of to the legitimate LAN gateway. This
-is an ancient technique known as [ARP spoofing][6].
+We are going to use the [arpfox][4] tool to alter the ARP table of the target
+machine in order to make it redirect its traffic to Hyperfox instead of to the
+legitimate LAN gateway. This is an ancient technique known as [ARP
+spoofing][6].
 
 First, identify both the local IP of the legitimate gateway and its matching
 network interface.
@@ -79,14 +79,14 @@ We're almost ready, prepare Hyperfox to receive plain HTTP traffic:
 2014/12/31 07:53:29 Listening for incoming HTTP client requests on 0.0.0.0:1080.
 ```
 
-Finally, run `arpspoof` to alter the target's ARP table so it starts sending
-its network traffic to the host box.
+Finally, run `arpfox` to alter the target's ARP table so it starts sending its
+network traffic to the host box:
 
 ```sh
-> sudo arpspoof -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
+> sudo arpfox -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
 ```
 
-And watch the live traffic coming in.
+and watch the live traffic coming in.
 
 ## Contributing to Hyperfox
 
@@ -119,7 +119,7 @@ pull request.
 [1]: https://hyperfox.org
 [2]: https://golang.org/doc/install
 [3]: https://en.wikipedia.org/wiki/Man-in-the-middle_attack
-[4]: http://monkey.org/~dugsong/dsniff/
+[4]: https://github.com/malfunkt/arpfox
 [5]: http://git-scm.com
 [6]: https://en.wikipedia.org/wiki/ARP_spoofing
-[7]: https://github.com/xiam/hyperfox/issues
+[7]: https://github.com/malfunkt/hyperfox/issues
