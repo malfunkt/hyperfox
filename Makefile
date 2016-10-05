@@ -50,7 +50,7 @@ docker-build: vendor-sync docker-builder clean
 	gzip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_linux_* && \
 	zip -r $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.zip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.exe && \
 	zip -r $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.zip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.exe && \
-	rm $(BUILD_OUTPUT_DIR)/*.exe
+	rm -f $(BUILD_OUTPUT_DIR)/*.exe
 
 docker-builder:
 	(docker stop $(DOCKER_CONTAINER) || exit 0) && \
