@@ -37,9 +37,10 @@ import (
 const version = "1.9.7"
 
 const (
-	defaultAddress = `0.0.0.0`
-	defaultPort    = uint(1080)
-	defaultSSLPort = uint(10443)
+	defaultAddress  = `0.0.0.0`
+	defaultPort     = uint(1080)
+	defaultSSLPort  = uint(10443)
+	proxyUnixSocket = `/tmp/hyperfox`
 )
 
 var (
@@ -49,6 +50,7 @@ var (
 	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Port to bind to (SSL mode).")
 	flagSSLCertFile = flag.String("c", "", "Path to root CA certificate.")
 	flagSSLKeyFile  = flag.String("k", "", "Path to root CA key.")
+	flagUnixSocket  = flag.String("S", "", "Path to socket.")
 )
 
 var (
@@ -99,7 +101,7 @@ func main() {
 		os.Setenv(proxy.EnvSSLKey, *flagSSLKeyFile)
 	}
 
-	// Creatig proxy.
+	// Creating proxy.
 	p := proxy.NewProxy()
 
 	// Attaching logger.
@@ -133,13 +135,15 @@ func main() {
 	var wg sync.WaitGroup
 
 	// Starting proxy servers.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-			log.Fatalf("Failed to bind on the given interface (HTTP): ", err)
-		}
-	}()
+	if *flagPort > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
+				log.Fatalf("Failed to bind on the given interface (HTTP): ", err)
+			}
+		}()
+	}
 
 	if sslEnabled {
 		wg.Add(1)
@@ -147,6 +151,16 @@ func main() {
 			defer wg.Done()
 			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
 				log.Fatalf("Failed to bind on the given interface (HTTPS): ", err)
+			}
+		}()
+	}
+
+	if *flagUnixSocket != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := p.StartUnix(proxyUnixSocket, *flagUnixSocket); err != nil {
+				log.Fatalf("Failed to bind on %s: %s", proxyUnixSocket, err)
 			}
 		}()
 	}
