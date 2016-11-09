@@ -30,6 +30,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/malfunkt/hyperfox/lib/gencert"
@@ -361,8 +362,7 @@ type UnixDirector struct {
 	URL string
 }
 
-func (d UnixDirector) Direct(req *http.Request) error {
-	newRequest, _ := http.NewRequest(req.Method, d.URL+req.URL.Path, req.Body)
-	*req = *newRequest
-	return nil
+func (d UnixDirector) Direct(req *http.Request) (err error) {
+	req.URL, err = url.Parse(d.URL + req.URL.Path)
+	return
 }
