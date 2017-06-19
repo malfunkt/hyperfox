@@ -10,7 +10,7 @@ with a root CA certificate and its corresponding key. If the target machine
 recognizes the root CA as trusted, then HTTPs traffic can be successfully
 decrypted, intercepted and recorded.
 
-![Hyperfox SSL](https://hyperfox.org/images/hyperfox-diagram.png)
+![Hyperfox SSL](https://hyperfox.org/images/hyperfox-ssl.png)
 
 This is the development repository, check out the [https://hyperfox.org][1]
 site for usage information.
