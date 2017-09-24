@@ -21,6 +21,12 @@
 			"revisionTime": "2016-10-04T16:01:36Z"
 		},
 		{
+			"checksumSHA1": "2xcr/mhxBFlDjpxe/Mc2Wb4RGR8=",
+			"path": "github.com/tv42/httpunix",
+			"revision": "b75d8614f926c077e48d85f1f8f7885b758c6225",
+			"revisionTime": "2015-04-27T01:28:21Z"
+		},
+		{
 			"checksumSHA1": "GIGmSrYACByf5JDIP9ByBZksY80=",
 			"path": "golang.org/x/net/idna",
 			"revision": "075e191f18186a8ff2becaf64478e30f4545cdad",
@@ -33,56 +39,58 @@
 			"revisionTime": "2014-12-21T20:36:44Z"
 		},
 		{
-			"checksumSHA1": "E0ZGp3xUBhoUvetpNh7pebDFyxM=",
-			"path": "upper.io/db.v2",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "i2maYYRSi6bkkfzu97ZZzUhCcjc=",
+			"path": "upper.io/db.v3/internal/cache",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "xmdIb9FZxQZZH6PLdNPHzW+GuJI=",
-			"path": "upper.io/db.v2/internal/cache",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "ToEr+HdfxxNijLEKeW4mEs8lHl0=",
+			"path": "upper.io/db.v3/internal/cache/hashstructure",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "8dZt1RYgzUgPFs0xuEMn14W5aiU=",
-			"path": "upper.io/db.v2/internal/cache/hashstructure",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "urKOk7QFZYcplp6Dn+JMdy9wXqU=",
+			"path": "upper.io/db.v3/internal/immutable",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"path": "upper.io/db.v2/internal/logger",
-			"revision": ""
+			"checksumSHA1": "u3jqPx3HslmTgwafgwnKljaYaM0=",
+			"path": "upper.io/db.v3/internal/sqladapter",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "NWh0yReCRuYiBi/EYS0hY778BX8=",
-			"path": "upper.io/db.v2/internal/sqladapter",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "yNnqV3KGFTos+DtGyGk39cyiCps=",
+			"path": "upper.io/db.v3/internal/sqladapter/compat",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "PmGQXXNAU67IZjhf7y7MunJIMDQ=",
-			"path": "upper.io/db.v2/internal/sqladapter/exql",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "3jVOqpKBt54HrGIZWuklkuVo0rA=",
+			"path": "upper.io/db.v3/internal/sqladapter/exql",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "9BBZRhHkGs7jb3Yozyyri/+NHCg=",
-			"path": "upper.io/db.v2/lib/reflectx",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "vww4sGRzU4GjJUklTPEX3b+BKZo=",
+			"path": "upper.io/db.v3/lib/reflectx",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "CVK7UW5Wf3ju5Jf+tpEa7YOvePk=",
-			"path": "upper.io/db.v2/lib/sqlbuilder",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "pOir3nl1BYbxrYfbEJSVGpFpMpg=",
+			"path": "upper.io/db.v3/lib/sqlbuilder",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "LCKL4uqGgxTJ1wI9q76+GYEoLWI=",
-			"path": "upper.io/db.v2/sqlite",
-			"revision": "44486cf0b7eb94f22e3c47f7ea4e217344511d55",
-			"revisionTime": "2016-10-04T14:12:43Z"
+			"checksumSHA1": "TOMUgTicMr+8rdSucH8b+xE1suk=",
+			"path": "upper.io/db.v3/postgresql",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
 		}
 	],
 	"rootPath": "github.com/malfunkt/hyperfox"

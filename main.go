@@ -31,7 +31,7 @@ import (
 	"github.com/malfunkt/hyperfox/lib/plugins/capture"
 	"github.com/malfunkt/hyperfox/lib/plugins/logger"
 	"github.com/malfunkt/hyperfox/lib/proxy"
-	"upper.io/db.v2"
+	"upper.io/db.v3"
 )
 
 const version = "1.9.7"

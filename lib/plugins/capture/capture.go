@@ -13,12 +13,12 @@ type Header struct {
 }
 
 type Response struct {
-	ID            uint      `json:"id" db:"id,omitempty"`
+	ID            uint64    `json:"id" db:"id,omitempty"`
 	Origin        string    `json:"origin" db:"origin"`
 	Method        string    `json:"method" db:"method"`
 	Status        int       `json:"status" db:"status"`
 	ContentType   string    `json:"content_type" db:"content_type"`
-	ContentLength uint      `json:"content_length" db:"content_length"`
+	ContentLength uint64    `json:"content_length" db:"content_length"`
 	Host          string    `json:"host" db:"host"`
 	URL           string    `json:"url" db:"url"`
 	Scheme        string    `json:"scheme" db:"scheme"`
@@ -64,7 +64,7 @@ func (cwc *CaptureWriteCloser) Close() error {
 		Method:        cwc.r.Request.Method,
 		Status:        cwc.r.StatusCode,
 		ContentType:   http.DetectContentType(cwc.Bytes()),
-		ContentLength: uint(cwc.Len()),
+		ContentLength: uint64(cwc.Len()),
 		Host:          cwc.r.Request.URL.Host,
 		URL:           cwc.r.Request.URL.String(),
 		Scheme:        cwc.r.Request.URL.Scheme,

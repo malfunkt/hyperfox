@@ -9,7 +9,7 @@ GH_OWNER            ?= malfunkt
 GH_REPO             ?= hyperfox
 GH_ACCESS_TOKEN     ?=
 
-build: generate vendor-sync
+build: vendor-sync
 	go build -o hyperfox github.com/malfunkt/hyperfox
 
 all: docker-build

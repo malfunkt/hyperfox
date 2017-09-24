@@ -33,17 +33,19 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/malfunkt/hyperfox/lib/plugins/capture"
-	"menteslibres.net/gosexy/to"
-	"upper.io/db.v2"
+	"upper.io/db.v3"
 )
 
 var (
-	cleanPattern  = regexp.MustCompile(`[^0-9a-zA-Z\s\.]`)
-	spacesPattern = regexp.MustCompile(`\s+`)
+	reUnsafeChars   = regexp.MustCompile(`[^0-9a-zA-Z\s\.]`)
+	reUnsafeFile    = regexp.MustCompile(`[^0-9a-zA-Z-_]`)
+	reRepeatedDash  = regexp.MustCompile(`-+`)
+	reRepeatedBlank = regexp.MustCompile(`\s+`)
 )
 
 const (
@@ -100,14 +102,23 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wireFormat := to.Bool(r.Form.Get("wire"))
+	wireFormat := false
+	if r.Form.Get("wire") != "" {
+		wireFormat = true
+	}
+
 	direction := r.Form.Get("type")
 
 	var response getResponse
+	response.ID, err = strconv.ParseUint(r.Form.Get("id"), 10, 64)
+	if err != nil {
+		replyCode(w, http.StatusInternalServerError)
+		return
+	}
 
-	res := storage.Find(response.ID)
+	res := storage.Find(db.Cond{"id": response.ID})
 
-	res.Select(
+	res = res.Select(
 		"id",
 		"url",
 		"method",
@@ -131,8 +142,14 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	basename := u.Host + "-" + path.Base(u.Path)
+	basename = reUnsafeFile.ReplaceAllString(basename, "-")
+	basename = strings.Trim(reRepeatedDash.ReplaceAllString(basename, "-"), "-")
+	if path.Ext(basename) == "" {
+		basename = basename + ".txt"
+	}
+
 	var body []byte
-	basename := path.Base(u.Path)
 	var headers http.Header
 
 	if direction == directionRequest {
@@ -143,7 +160,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		headers = response.RequestHeader.Header
 	} else {
-		if body, err = hex.DecodeString(string(response.RequestBody)); err != nil {
+		if body, err = hex.DecodeString(string(response.Body)); err != nil {
 			log.Printf("url.Parse: %q", err)
 			replyCode(w, http.StatusInternalServerError)
 			return
@@ -159,7 +176,8 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		buf.WriteString("\r\n")
-		w.Header().Set("Content-Disposition", `attachment; filename="`+u.Host+"-"+basename+`.bin"`)
+
+		w.Header().Set("Content-Disposition", `attachment; filename="`+basename+`"`)
 		buf.Write(body)
 
 		http.ServeContent(w, r, "", response.DateEnd, bytes.NewReader(buf.Bytes()))
@@ -172,7 +190,6 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 // getHandler service returns a request body.
 func getHandler(w http.ResponseWriter, r *http.Request) {
-
 	var err error
 	if err = r.ParseForm(); err != nil {
 		log.Printf("ParseForm: %q", err)
@@ -181,11 +198,15 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var response getResponse
-	response.ID = uint(to.Int64(r.Form.Get("id")))
+	response.ID, err = strconv.ParseUint(r.Form.Get("id"), 10, 64)
+	if err != nil {
+		replyCode(w, http.StatusInternalServerError)
+		return
+	}
 
-	res := storage.Find(response.ID)
+	res := storage.Find(db.Cond{"id": response.ID})
 
-	res.Select(
+	res = res.Select(
 		"id",
 		"method",
 		"origin",
@@ -224,10 +245,15 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 
 	q := r.Form.Get("q")
 
-	q = cleanPattern.ReplaceAllString(q, " ")
-	q = spacesPattern.ReplaceAllString(q, " ")
+	q = reUnsafeChars.ReplaceAllString(q, " ")
+	q = reRepeatedBlank.ReplaceAllString(q, " ")
 
-	response.Page = uint(to.Int64(r.Form.Get("page")))
+	{
+		page, err := strconv.ParseUint(r.Form.Get("page"), 10, 64)
+		if err == nil {
+			response.Page = uint(page)
+		}
+	}
 
 	if response.Page < 1 {
 		response.Page = 1
@@ -247,19 +273,21 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 		"content_type",
 		"date_start",
 		"time_taken",
-	).OrderBy("id").Limit(pageSize).Offset(pageSize * int(response.Page-1))
+	).OrderBy("id").
+		Limit(pageSize).
+		Offset(pageSize * int(response.Page-1))
 
 	if q != "" {
 		terms := strings.Split(q, " ")
 		conds := db.Or()
 
 		for _, term := range terms {
-			conds.Or(
+			conds = conds.Or(
 				db.Or(
-					db.Raw(`host LIKE '%`+term+`%'`),
-					db.Raw(`origin LIKE '%`+term+`%'`),
-					db.Raw(`path LIKE '%`+term+`%'`),
-					db.Raw(`content_type LIKE '%`+term+`%'`),
+					db.Cond{"host LIKE": "%" + term + "%"},
+					db.Cond{"origin LIKE": "%" + term + "%"},
+					db.Cond{"path LIKE": "%" + term + "%"},
+					db.Cond{"content_type LIKE": "%" + term + "%"},
 					db.Cond{"method": term},
 					db.Cond{"scheme": term},
 					db.Cond{"status": term},
@@ -267,7 +295,7 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 			)
 		}
 
-		res.Where(conds)
+		res = res.Where(conds)
 	}
 
 	// Pulling information page.
