@@ -39,6 +39,12 @@
 			"revisionTime": "2014-12-21T20:36:44Z"
 		},
 		{
+			"checksumSHA1": "evRgVxpwUEOEz+4r71CggNoQ4+o=",
+			"path": "upper.io/db.v3",
+			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
+			"revisionTime": "2017-08-19T13:30:54Z"
+		},
+		{
 			"checksumSHA1": "i2maYYRSi6bkkfzu97ZZzUhCcjc=",
 			"path": "upper.io/db.v3/internal/cache",
 			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
@@ -87,8 +93,8 @@
 			"revisionTime": "2017-08-19T13:30:54Z"
 		},
 		{
-			"checksumSHA1": "TOMUgTicMr+8rdSucH8b+xE1suk=",
-			"path": "upper.io/db.v3/postgresql",
+			"checksumSHA1": "3BCLutT8T30I0xr/22ZWm2z2Gh4=",
+			"path": "upper.io/db.v3/sqlite",
 			"revision": "46f50a98f8d5d77d1d4631f1bcc0ce6496e55734",
 			"revisionTime": "2017-08-19T13:30:54Z"
 		}
