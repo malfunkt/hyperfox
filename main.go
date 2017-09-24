@@ -34,7 +34,7 @@ import (
 	"upper.io/db.v3"
 )
 
-const version = "1.9.7"
+const version = "1.9.8"
 
 const (
 	defaultAddress  = `0.0.0.0`
