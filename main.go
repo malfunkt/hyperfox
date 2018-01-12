@@ -32,6 +32,7 @@ import (
 	"github.com/malfunkt/hyperfox/lib/plugins/logger"
 	"github.com/malfunkt/hyperfox/lib/proxy"
 	"upper.io/db.v3"
+	"strings"
 )
 
 const version = "1.9.8"
@@ -39,7 +40,7 @@ const version = "1.9.8"
 const (
 	defaultAddress  = `0.0.0.0`
 	defaultPort     = uint(1080)
-	defaultSSLPort  = uint(10443)
+	defaultSSLPort  = uint(0)
 	proxyUnixSocket = `/tmp/hyperfox`
 )
 
@@ -51,6 +52,12 @@ var (
 	flagSSLCertFile = flag.String("c", "", "Path to root CA certificate.")
 	flagSSLKeyFile  = flag.String("k", "", "Path to root CA key.")
 	flagUnixSocket  = flag.String("S", "", "Path to socket.")
+	flagHTTPProxy   = flag.String("httpProxy", "",
+		"start http reverse proxy, format example: 10.0.0.2:80-192.168.0.2:80, " +
+			"part before dash is listen address, part after dash is destination address.")
+	flagHTTPSProxy  = flag.String("httpsProxy", "",
+		"start https reverse proxy, format example: 10.0.0.2:443-192.168.0.2:443, " +
+			"part before dash is listen address, part after dash is destination address.")
 )
 
 var (
@@ -60,7 +67,7 @@ var (
 
 func main() {
 	// Banner.
-	log.Printf("Hyperfox v%s // https://hyperfox.org\n", version)
+	log.Printf("Hyperfox v%s // https://hyperfox.org", version)
 	log.Printf("By José Carlos Nieto.\n\n")
 
 	// Parsing command line flags.
@@ -80,13 +87,7 @@ func main() {
 	}
 
 	// Is SSL enabled?
-	var sslEnabled bool
-	if *flagSSLPort > 0 && *flagSSLCertFile != "" {
-		sslEnabled = true
-	}
-
-	// User requested SSL mode.
-	if sslEnabled {
+	if *flagSSLPort > 0 || *flagHTTPSProxy != "" {
 		if *flagSSLCertFile == "" {
 			flag.Usage()
 			log.Fatal("Missing root CA certificate")
@@ -101,16 +102,9 @@ func main() {
 		os.Setenv(proxy.EnvSSLKey, *flagSSLKeyFile)
 	}
 
-	// Creating proxy.
-	p := proxy.NewProxy()
-
-	// Attaching logger.
-	p.AddLogger(logger.Stdout{})
-
 	// Attaching capture tool.
 	res := make(chan capture.Response, 256)
-
-	p.AddBodyWriteCloser(capture.New(res))
+	capt := capture.New(res)
 
 	// Saving captured data with a goroutine.
 	go func() {
@@ -139,18 +133,49 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-				log.Fatalf("Failed to bind on the given interface (HTTP): ", err)
+			addr := fmt.Sprintf("%s:%d", *flagAddress, *flagPort)
+			if err := startHTTPProxy(addr, "", capt); err != nil {
+				log.Fatalf("Failed to route mode http proxy, bind address: %s, error: %s", addr, err)
 			}
 		}()
 	}
 
-	if sslEnabled {
+	// start http reverse proxy
+	if *flagHTTPProxy != "" {
+		addrs := strings.Split(*flagHTTPProxy, "-")
+		if len(addrs) != 2 {
+			log.Fatalf("'%s' is not valid http proxy address", flagHTTPProxy)
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
-				log.Fatalf("Failed to bind on the given interface (HTTPS): ", err)
+			if err := startHTTPProxy(addrs[0], addrs[1], capt); err != nil {
+				log.Fatalf("Failed to http reverse proxy, address: %s, error: %s", *flagHTTPProxy, err)
+			}
+		}()
+	}
+
+	if *flagSSLPort > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			addr := fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)
+			if err := startHTTPSProxy(addr, "", capt); err != nil {
+				log.Fatalf("Failed to route mode https proxy, bind address: %s, error: %s", addr, err)
+			}
+		}()
+	}
+
+	if *flagHTTPSProxy != "" {
+		addrs := strings.Split(*flagHTTPSProxy, "-")
+		if len(addrs) != 2 {
+			log.Fatalf("'%s' is not valid https proxy address", *flagHTTPSProxy)
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := startHTTPSProxy(addrs[0], addrs[1], capt); err != nil {
+				log.Fatalf("Failed to https reverse proxy, address: %s, error: %s", *flagHTTPSProxy, err)
 			}
 		}()
 	}
@@ -159,11 +184,35 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := p.StartUnix(proxyUnixSocket, *flagUnixSocket); err != nil {
+			if err := startUnixSocketProxy(proxyUnixSocket, *flagUnixSocket, capt); err != nil {
 				log.Fatalf("Failed to bind on %s: %s", proxyUnixSocket, err)
 			}
 		}()
 	}
 
 	wg.Wait()
+}
+
+func startHTTPProxy(listenAddr, dstAddr string, capt *capture.Capture) error {
+	p := proxy.NewProxy(listenAddr, dstAddr)
+	// Attaching logger.
+	p.AddLogger(logger.Stdout{})
+	p.AddBodyWriteCloser(capt)
+	return p.Start()
+}
+
+func startHTTPSProxy(listenAddr, dstAddr string, capt *capture.Capture) error {
+	p := proxy.NewProxy(listenAddr, dstAddr)
+	// Attaching logger.
+	p.AddLogger(logger.Stdout{})
+	p.AddBodyWriteCloser(capt)
+	return p.StartTLS()
+}
+
+func startUnixSocketProxy(listenAddr, dstAddr string, capt *capture.Capture) error {
+	p := proxy.NewProxy(listenAddr, dstAddr)
+	// Attaching logger.
+	p.AddLogger(logger.Stdout{})
+	p.AddBodyWriteCloser(capt)
+	return p.StartUnix()
 }

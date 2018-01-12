@@ -125,10 +125,10 @@ func newTestResponseWriter() *testResponseWriter {
 }
 
 func TestListenHTTP(t *testing.T) {
-	proxy = NewProxy()
+	proxy = NewProxy(listenHTTPAddr, "")
 
 	go func(t *testing.T) {
-		if err := proxy.Start(listenHTTPAddr); err != nil {
+		if err := proxy.Start(); err != nil {
 			t.Fatal(err)
 		}
 	}(t)
@@ -137,10 +137,10 @@ func TestListenHTTP(t *testing.T) {
 }
 
 func TestListenHTTPs(t *testing.T) {
-	sslProxy = NewProxy()
+	sslProxy = NewProxy(listenHTTPsAddr, "")
 
 	go func(t *testing.T) {
-		if err := sslProxy.StartTLS(listenHTTPsAddr); err != nil {
+		if err := sslProxy.StartTLS(); err != nil {
 			t.Fatal(err)
 		}
 	}(t)
@@ -182,10 +182,10 @@ func TestUnixServer(t *testing.T) {
 }
 
 func TestListenUnix(t *testing.T) {
-	unixProxy = NewProxy()
+	unixProxy = NewProxy(listenUnixPath, serverUnixPath)
 
 	go func(t *testing.T) {
-		if err := unixProxy.StartUnix(listenUnixPath, serverUnixPath); err != nil {
+		if err := unixProxy.StartUnix(); err != nil {
 			t.Fatal(err)
 		}
 	}(t)

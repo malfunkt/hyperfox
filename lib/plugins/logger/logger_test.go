@@ -61,10 +61,10 @@ func newTestResponseWriter() *testResponseWriter {
 }
 
 func TestListenHTTP(t *testing.T) {
-	px = proxy.NewProxy()
+	px = proxy.NewProxy(listenHTTPAddr, "")
 
 	go func(t *testing.T) {
-		if err := px.Start(listenHTTPAddr); err != nil {
+		if err := px.Start(); err != nil {
 			t.Fatal(err)
 		}
 	}(t)

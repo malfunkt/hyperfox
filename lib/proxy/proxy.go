@@ -98,6 +98,10 @@ type Proxy struct {
 	interceptors []Interceptor
 	// Logger functions.
 	loggers []Logger
+	// The proxy's listen address
+	listenAddr string
+	// Destination server, if not empty, the proxy acts as a reverse proxy
+	dstAddr string
 }
 
 // ProxiedRequest struct provides properties for executing a *http.Request and
@@ -108,9 +112,14 @@ type ProxiedRequest struct {
 	Response       *http.Response
 }
 
-// NewProxy creates and returns a Proxy reference.
-func NewProxy() *Proxy {
-	return &Proxy{}
+// NewProxy creates and returns a Proxy reference. the proxy will listen on the
+// given address. if dstAddr is not empty, the proxy will be a reverse proxy,
+// and forward request data to dstAddr
+func NewProxy(listenAddr, dstServer string) *Proxy {
+	return &Proxy{
+		listenAddr: listenAddr,
+		dstAddr:    dstServer,
+	}
 }
 
 // Reset clears the list of interfaces.
@@ -183,8 +192,13 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		out.URL.Scheme = "https"
 	}
 
+	if p.dstAddr != "" {
+		out.Host = p.dstAddr
+	}
+
 	// Making sure the Host header is present.
 	out.URL.Host = out.Host
+	log.Println("Host: ", out.Host);
 	out.Header.Add("Host", out.Host)
 
 	out.Proto = "HTTP/1.1"
@@ -280,14 +294,14 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Start creates an HTTP proxy server that listens on the given address.
-func (p *Proxy) Start(addr string) error {
+func (p *Proxy) Start() error {
 	p.srv = http.Server{
-		Addr:    addr,
+		Addr:    p.listenAddr,
 		Handler: p,
 	}
 	p.rt = &http.Transport{}
 
-	log.Printf("Listening for incoming HTTP client requests on %s.\n", addr)
+	log.Printf("Listening for incoming HTTP client requests on %s.\n", p.listenAddr)
 	if err := p.srv.ListenAndServe(); err != nil {
 		return err
 	}
@@ -309,22 +323,22 @@ func certificateLookup(clientHello *tls.ClientHelloInfo) (*tls.Certificate, erro
 }
 
 // StartTLS creates an HTTPs proxy server that listens on the given address.
-func (p *Proxy) StartTLS(addr string) error {
+func (p *Proxy) StartTLS() error {
 	p.srv = http.Server{
-		Addr:    addr,
+		Addr:    p.listenAddr,
 		Handler: p,
 		TLSConfig: &tls.Config{
 			GetCertificate:     certificateLookup,
-			InsecureSkipVerify: false,
+			InsecureSkipVerify: true,
 		},
 	}
 	p.rt = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: false,
+			InsecureSkipVerify: true,
 		},
 	}
 
-	log.Printf("Listening for incoming HTTPs client requests on %s.\n", addr)
+	log.Printf("Listening for incoming HTTPs client requests on %s.\n", p.listenAddr)
 
 	gencert.SetRootCACert(os.Getenv(EnvSSLCert))
 	gencert.SetRootCAKey(os.Getenv(EnvSSLKey))
@@ -336,25 +350,25 @@ func (p *Proxy) StartTLS(addr string) error {
 }
 
 // StartUnix creates an HTTP proxy server that listens on the proxy unix socket and forwards to proxied unix socket.
-func (p *Proxy) StartUnix(proxy string, proxied string) error {
+func (p *Proxy) StartUnix() error {
 	p.srv = http.Server{
 		Addr:    "http+unix://proxy",
 		Handler: p,
 	}
 	u := &httpunix.Transport{}
-	u.RegisterLocation("proxied", proxied)
+	u.RegisterLocation("proxied", p.dstAddr)
 	p.rt = u
 	p.AddDirector(UnixDirector{"http+unix://proxied"})
 
-	log.Printf("Listening for incoming HTTP client requests on %s\n", proxy)
+	log.Printf("Listening for incoming HTTP client requests on %s\n", p.listenAddr)
 
-	os.Remove(proxy)
-	l, err := net.Listen("unix", proxy)
+	os.Remove(p.listenAddr)
+	l, err := net.Listen("unix", p.listenAddr)
 	if err != nil {
 		return err
 	}
 	defer l.Close()
-	defer os.Remove(proxy)
+	defer os.Remove(p.listenAddr)
 	return p.srv.Serve(l)
 }
 
