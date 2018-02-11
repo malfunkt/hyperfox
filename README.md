@@ -1,5 +1,7 @@
 # Hyperfox
 
+[![Build Status](https://travis-ci.org/malfunkt/hyperfox.svg?branch=master)](https://travis-ci.org/malfunkt/hyperfox)
+
 [Hyperfox][1] is a security tool for proxying and recording HTTP and HTTPs
 communications on a LAN.
 

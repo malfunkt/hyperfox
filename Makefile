@@ -53,11 +53,10 @@ docker-build: vendor-sync docker-builder clean
 	rm -f $(BUILD_OUTPUT_DIR)/*.exe
 
 docker-builder:
-	(docker stop $(DOCKER_CONTAINER) || exit 0) && \
 	docker build -t $(DOCKER_CONTAINER) .
 
 vendor-sync:
-	govendor sync
+	dep ensure
 
 clean:
 	rm -f *.db && \
