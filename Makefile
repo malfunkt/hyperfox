@@ -9,12 +9,12 @@ GH_OWNER            ?= malfunkt
 GH_REPO             ?= hyperfox
 GH_ACCESS_TOKEN     ?=
 
-build: vendor-sync
-	go build -o hyperfox github.com/malfunkt/hyperfox
-
 all: docker-build
 
-docker-build: vendor-sync docker-builder clean
+build:
+	go build -o hyperfox github.com/malfunkt/hyperfox
+
+docker-build: docker-builder clean
 	mkdir -p $(BUILD_OUTPUT_DIR) && \
 	docker run \
 		-v $$PWD:/app/src/$(BUILD_PATH) \
@@ -54,9 +54,6 @@ docker-build: vendor-sync docker-builder clean
 
 docker-builder:
 	docker build -t $(DOCKER_CONTAINER) .
-
-vendor-sync:
-	dep ensure
 
 clean:
 	rm -f *.db && \

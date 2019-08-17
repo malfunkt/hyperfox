@@ -1,0 +1,6 @@
+*
+!lib
+!ssl
+!*.go
+!go.mod
+!go.sum
