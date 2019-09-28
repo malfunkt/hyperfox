@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Nieto, https://xiam.io
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -61,7 +61,7 @@ var (
 func main() {
 	// Banner.
 	log.Printf("Hyperfox v%s // https://hyperfox.org\n", version)
-	log.Printf("By José Carlos Nieto.\n\n")
+	log.Printf("By José Nieto.\n\n")
 
 	// Parsing command line flags.
 	flag.Parse()
