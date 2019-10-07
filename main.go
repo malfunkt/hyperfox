@@ -108,23 +108,23 @@ func main() {
 	p.AddLogger(logger.Stdout{})
 
 	// Attaching capture tool.
-	res := make(chan capture.Response, 256)
+	res := make(chan *capture.Response, 256)
 
 	p.AddBodyWriteCloser(capture.New(res))
 
 	// Saving captured data with a goroutine.
-	go func() {
-		for {
-			select {
-			case r := <-res:
-				go func() {
-					if _, err := storage.Insert(r); err != nil {
-						log.Printf("Failed to save to database: %s", err)
-					}
-				}()
-			}
+	go func(res chan *capture.Response) {
+		for r := range res {
+			go func(r *capture.Response) {
+				id, err := storage.Insert(r)
+				if err != nil {
+					log.Printf("Failed to save to database: %s", err)
+				}
+				r.ResponseMeta.ID = uint64(id.(int64))
+				wsBroadcast(r.ResponseMeta)
+			}(r)
 		}
-	}()
+	}(res)
 
 	if err = startServices(); err != nil {
 		log.Fatal("startServices:", err)

@@ -36,7 +36,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/malfunkt/hyperfox/lib/plugins/capture"
 	"upper.io/db.v3"
 )
@@ -49,7 +48,7 @@ var (
 )
 
 const (
-	serviceBindHost      = `127.0.0.1`
+	serviceBindHost      = `0.0.0.0`
 	serviceBindStartPort = 3030
 )
 
@@ -58,14 +57,10 @@ const (
 	directionRequest = `req`
 )
 
-type getResponse struct {
-	capture.Response `json:",inline"`
-}
-
 type pullResponse struct {
-	Data  []capture.Response `json:"data"`
-	Pages uint               `json:"pages"`
-	Page  uint               `json:"page"`
+	Requests []capture.ResponseMeta `json:"requests"`
+	Pages    uint                   `json:"pages"`
+	Page     uint                   `json:"page"`
 }
 
 func replyCode(w http.ResponseWriter, httpCode int) {
@@ -84,13 +79,14 @@ func replyJSON(w http.ResponseWriter, data interface{}) {
 	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(buf)
 }
 
-func rootHandler(http.ResponseWriter, *http.Request) {
-
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	replyCode(w, http.StatusOK)
 }
 
 // downloadHandler provides a downloadable document given its ID.
@@ -109,7 +105,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	direction := r.Form.Get("type")
 
-	var response getResponse
+	var response capture.Response
 	response.ID, err = strconv.ParseUint(r.Form.Get("id"), 10, 64)
 	if err != nil {
 		replyCode(w, http.StatusInternalServerError)
@@ -129,7 +125,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		db.Raw("hex(request_body) AS request_body"),
 	)
 
-	if err = res.One(&response.Response); err != nil {
+	if err = res.One(&response); err != nil {
 		log.Printf("res.One: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
@@ -191,13 +187,14 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 // getHandler service returns a request body.
 func getHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
+
 	if err = r.ParseForm(); err != nil {
 		log.Printf("ParseForm: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
 	}
 
-	var response getResponse
+	var response capture.ResponseMeta
 	response.ID, err = strconv.ParseUint(r.Form.Get("id"), 10, 64)
 	if err != nil {
 		replyCode(w, http.StatusInternalServerError)
@@ -205,25 +202,7 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := storage.Find(db.Cond{"id": response.ID})
-
-	res = res.Select(
-		"id",
-		"method",
-		"origin",
-		"content_type",
-		"content_length",
-		"status",
-		"host",
-		"url",
-		"scheme",
-		"header",
-		"request_header",
-		"date_start",
-		"date_end",
-		"time_taken",
-	)
-
-	if err = res.One(&response.Response); err != nil {
+	if err = res.One(&response); err != nil {
 		log.Printf("res.One: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
@@ -260,20 +239,7 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Result set
-	res := storage.Find().Select(
-		"id",
-		"method",
-		"origin",
-		"status",
-		"host",
-		"path",
-		"scheme",
-		"url",
-		"content_length",
-		"content_type",
-		"date_start",
-		"time_taken",
-	).OrderBy("id").
+	res := storage.Find().OrderBy("id").
 		Limit(pageSize).
 		Offset(pageSize * int(response.Page-1))
 
@@ -299,7 +265,7 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Pulling information page.
-	if err = res.All(&response.Data); err != nil {
+	if err = res.All(&response.Requests); err != nil {
 		log.Printf("res.All: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
@@ -317,17 +283,18 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 // services.
 func startServices() error {
 
-	r := mux.NewRouter()
+	r := http.NewServeMux()
 
 	r.HandleFunc("/", rootHandler)
 	r.HandleFunc("/pull", pullHandler)
 	r.HandleFunc("/get", getHandler)
 	r.HandleFunc("/download", downloadHandler)
+	r.HandleFunc("/ws", wsHandler)
 
 	log.Printf("Starting (local) API server...")
 
 	// Looking for a port to listen to.
-	ln, err := net.Listen("tcp", serviceBindHost+":0")
+	ln, err := net.Listen("tcp", serviceBindHost+":8899")
 	if err != nil {
 		log.Fatal("net.Listen: ", err)
 	}

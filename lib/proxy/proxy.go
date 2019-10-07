@@ -337,6 +337,7 @@ func (p *Proxy) StartTLS(addr string) error {
 
 // StartUnix creates an HTTP proxy server that listens on the proxy unix socket and forwards to proxied unix socket.
 func (p *Proxy) StartUnix(proxy string, proxied string) error {
+
 	p.srv = http.Server{
 		Addr:    "http+unix://proxy",
 		Handler: p,
@@ -355,6 +356,7 @@ func (p *Proxy) StartUnix(proxy string, proxied string) error {
 	}
 	defer l.Close()
 	defer os.Remove(proxy)
+
 	return p.srv.Serve(l)
 }
 
