@@ -44,7 +44,7 @@ func wsReadMessages(conn *websocket.Conn) error {
 	for {
 		reply := map[string]string{}
 
-		if err := websocket.ReadJSON(conn, &reply); err != nil {
+		if err := conn.ReadJSON(&reply); err != nil {
 			fmt.Println("Can't receive: %v", err)
 			defer wsRemoveConn(conn)
 			return err
@@ -79,5 +79,5 @@ func wsRemoveConn(conn *websocket.Conn) {
 }
 
 func wsSendMessage(conn *websocket.Conn, message interface{}) error {
-	return websocket.WriteJSON(conn, message)
+	return conn.WriteJSON(message)
 }

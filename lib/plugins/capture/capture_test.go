@@ -77,7 +77,7 @@ func TestWriteCloser(t *testing.T) {
 	var req *http.Request
 	var err error
 
-	res := make(chan Response, 10)
+	res := make(chan *Response, 10)
 
 	px.AddBodyWriteCloser(New(res))
 
