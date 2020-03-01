@@ -33,7 +33,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/malfunkt/hyperfox/lib/gencert"
+	"github.com/malfunkt/hyperfox/pkg/gencert"
 	"github.com/tv42/httpunix"
 )
 
@@ -86,6 +86,7 @@ type Logger interface {
 // Proxy struct provides methods and properties for creating a proxy
 // programatically.
 type Proxy struct {
+	ln net.Listener
 	// Standard HTTP server
 	srv http.Server
 	// RoundTrip to proxied service
@@ -119,6 +120,14 @@ func (p *Proxy) Reset() {
 	p.directors = []Director{}
 	p.interceptors = []Interceptor{}
 	p.loggers = []Logger{}
+}
+
+// Stop terminates a running proxy
+func (p *Proxy) Stop() {
+	if p.ln == nil {
+		return
+	}
+	_ = p.ln.Close()
 }
 
 // NewProxiedRequest creates and returns a ProxiedRequest reference.
@@ -204,7 +213,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	bodyCopy := bytes.NewBuffer(nil)
 
 	if out.Body != nil {
-		io.Copy(io.MultiWriter(body, bodyCopy), out.Body)
+		if _, err := io.Copy(io.MultiWriter(body, bodyCopy), out.Body); err != nil {
+			log.Printf("io.Copy: %q", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		out.Body.Close()
 		out.Body = ioutil.NopCloser(body)
 	}
@@ -287,10 +300,17 @@ func (p *Proxy) Start(addr string) error {
 	}
 	p.rt = &http.Transport{}
 
-	log.Printf("Listening for incoming HTTP client requests on %s.\n", addr)
-	if err := p.srv.ListenAndServe(); err != nil {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
 		return err
 	}
+	p.ln = ln
+
+	log.Printf("Listening for incoming HTTP client requests on %s.\n", addr)
+	if err := p.srv.Serve(ln); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -324,20 +344,27 @@ func (p *Proxy) StartTLS(addr string) error {
 		},
 	}
 
-	log.Printf("Listening for incoming HTTPs client requests on %s.\n", addr)
+	cert, key := os.Getenv(EnvSSLCert), os.Getenv(EnvSSLKey)
 
-	gencert.SetRootCACert(os.Getenv(EnvSSLCert))
-	gencert.SetRootCAKey(os.Getenv(EnvSSLKey))
+	gencert.SetRootCACert(cert)
+	gencert.SetRootCAKey(key)
 
-	if err := p.srv.ListenAndServeTLS(os.Getenv(EnvSSLCert), os.Getenv(EnvSSLKey)); err != nil {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
 		return err
 	}
+	p.ln = ln
+
+	log.Printf("Listening for incoming HTTPs client requests on %s.\n", addr)
+	if err := p.srv.ServeTLS(ln, cert, key); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // StartUnix creates an HTTP proxy server that listens on the proxy unix socket and forwards to proxied unix socket.
 func (p *Proxy) StartUnix(proxy string, proxied string) error {
-
 	p.srv = http.Server{
 		Addr:    "http+unix://proxy",
 		Handler: p,
@@ -347,17 +374,16 @@ func (p *Proxy) StartUnix(proxy string, proxied string) error {
 	p.rt = u
 	p.AddDirector(UnixDirector{"http+unix://proxied"})
 
-	log.Printf("Listening for incoming HTTP client requests on %s\n", proxy)
-
 	os.Remove(proxy)
-	l, err := net.Listen("unix", proxy)
+	ln, err := net.Listen("unix", proxy)
 	if err != nil {
 		return err
 	}
-	defer l.Close()
 	defer os.Remove(proxy)
+	p.ln = ln
 
-	return p.srv.Serve(l)
+	log.Printf("Listening for incoming HTTP client requests on %s\n", proxy)
+	return p.srv.Serve(ln)
 }
 
 type UnixDirector struct {

@@ -19,15 +19,17 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-package logger
+package capture
 
 import (
 	"bytes"
+	"log"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/malfunkt/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/pkg/proxy"
 )
 
 const listenHTTPAddr = `127.0.0.1:37400`
@@ -63,29 +65,38 @@ func newTestResponseWriter() *testResponseWriter {
 func TestListenHTTP(t *testing.T) {
 	px = proxy.NewProxy()
 
-	go func(t *testing.T) {
-		if err := px.Start(listenHTTPAddr); err != nil {
+	go func() {
+		time.Sleep(time.Millisecond * 100)
+		px.Stop()
+	}()
+
+	if err := px.Start(listenHTTPAddr); err != nil {
+		if !strings.Contains(err.Error(), "use of closed network connection") {
 			t.Fatal(err)
 		}
-	}(t)
-
-	time.Sleep(time.Millisecond * 100)
+	}
 }
 
-func TestLoggerInterface(t *testing.T) {
+func TestWriteCloser(t *testing.T) {
 	var req *http.Request
 	var err error
 
-	// Adding write closer that will receive all the data and then a closing
-	// instruction.
-	px.AddLogger(Stdout{})
+	res := make(chan *Response, 10)
+
+	px.AddBodyWriteCloser(New(res))
 
 	urls := []string{
 		"http://golang.org/src/database/sql/",
 		"http://golang.org/",
 		"https://www.example.org",
-		"http://play.golang.org/p/-URiXol0GB",
+		"http://nmap.org",
 	}
+
+	go func() {
+		for r := range res {
+			log.Printf("Captured: %s, %d, (%d bytes) - %dns", r.URL, r.Status, len(r.Body), r.TimeTaken)
+		}
+	}()
 
 	for i := range urls {
 		// Creating a response writer.
@@ -99,4 +110,6 @@ func TestLoggerInterface(t *testing.T) {
 		// Executing request.
 		px.ServeHTTP(wri, req)
 	}
+
+	time.Sleep(time.Second * 1)
 }

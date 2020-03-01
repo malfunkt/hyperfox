@@ -36,7 +36,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/malfunkt/hyperfox/lib/plugins/capture"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 	"upper.io/db.v3"
 )
 
@@ -48,8 +48,7 @@ var (
 )
 
 const (
-	serviceBindHost      = `0.0.0.0`
-	serviceBindStartPort = 3030
+	serviceBindHost = `0.0.0.0`
 )
 
 const (
@@ -65,7 +64,7 @@ type pullResponse struct {
 
 func replyCode(w http.ResponseWriter, httpCode int) {
 	w.WriteHeader(httpCode)
-	w.Write([]byte(http.StatusText(httpCode)))
+	_, _ = w.Write([]byte(http.StatusText(httpCode)))
 }
 
 func replyJSON(w http.ResponseWriter, data interface{}) {
@@ -82,7 +81,7 @@ func replyJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(buf)
+	_, _ = w.Write(buf)
 }
 
 func rootHandler(w http.ResponseWriter, r *http.Request) {

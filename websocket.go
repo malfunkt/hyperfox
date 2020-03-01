@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
-	//	"github.com/malfunkt/hyperfox/lib/plugins/capture"
+	//	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 )
 
 var (
@@ -35,9 +35,15 @@ func wsAddConn(conn *websocket.Conn) {
 	defer wsMu.Unlock()
 
 	wsClients[conn] = struct{}{}
-	go wsReadMessages(conn)
+	go func() {
+		if err := wsReadMessages(conn); err != nil {
+			log.Print("wsReadMessages: ", err)
+		}
+	}()
 
-	wsSendMessage(conn, nil)
+	if err := wsSendMessage(conn, nil); err != nil {
+		log.Print("wsSendMessage: ", err)
+	}
 }
 
 func wsReadMessages(conn *websocket.Conn) error {
@@ -45,13 +51,12 @@ func wsReadMessages(conn *websocket.Conn) error {
 		reply := map[string]string{}
 
 		if err := conn.ReadJSON(&reply); err != nil {
-			fmt.Println("Can't receive: %v", err)
+			fmt.Print("Can't receive: ", err)
 			defer wsRemoveConn(conn)
 			return err
 		}
 		log.Printf("reply: %v", reply)
 	}
-	return nil
 }
 
 func wsBroadcast(message interface{}) error {
@@ -59,7 +64,7 @@ func wsBroadcast(message interface{}) error {
 
 	for conn := range wsClients {
 		if err := wsSendMessage(conn, message); err != nil {
-			log.Printf("wsSendMessage: ", err)
+			log.Print("wsSendMessage: ", err)
 			defer wsRemoveConn(conn)
 		}
 	}

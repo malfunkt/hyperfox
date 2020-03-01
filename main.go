@@ -28,9 +28,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/malfunkt/hyperfox/lib/plugins/capture"
-	"github.com/malfunkt/hyperfox/lib/plugins/logger"
-	"github.com/malfunkt/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
+	"github.com/malfunkt/hyperfox/pkg/plugins/logger"
+	"github.com/malfunkt/hyperfox/pkg/proxy"
 	"upper.io/db.v3"
 )
 
@@ -121,7 +121,9 @@ func main() {
 					log.Printf("Failed to save to database: %s", err)
 				}
 				r.ResponseMeta.ID = uint64(id.(int64))
-				wsBroadcast(r.ResponseMeta)
+				if err := wsBroadcast(r.ResponseMeta); err != nil {
+					log.Print("wsBroadcast: ", err)
+				}
 			}(r)
 		}
 	}(res)
@@ -140,7 +142,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-				log.Fatalf("Failed to bind on the given interface (HTTP): ", err)
+				log.Fatal("Failed to bind on the given interface (HTTP): ", err)
 			}
 		}()
 	}
@@ -150,7 +152,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
-				log.Fatalf("Failed to bind on the given interface (HTTPS): ", err)
+				log.Fatal("Failed to bind on the given interface (HTTPS): ", err)
 			}
 		}()
 	}
