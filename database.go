@@ -16,6 +16,7 @@ const (
 
 const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"id" INTEGER PRIMARY KEY,
+	"uuid" VARCHAR(36) NOT NULL,
 	"origin" VARCHAR(255),
 	"method" VARCHAR(10),
 	"status" INTEGER,

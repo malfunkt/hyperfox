@@ -26,6 +26,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 	"log"
 	"math"
 	"net"
@@ -35,8 +38,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 	"upper.io/db.v3"
 )
 
@@ -90,28 +91,17 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 // downloadHandler provides a downloadable document given its ID.
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
-	var err error
-	if err = r.ParseForm(); err != nil {
-		log.Printf("ParseForm: %q", err)
-		replyCode(w, http.StatusInternalServerError)
-		return
-	}
-
 	wireFormat := false
-	if r.Form.Get("wire") != "" {
+	if chi.URLParam(r, "wire") != "" {
 		wireFormat = true
 	}
 
-	direction := r.Form.Get("type")
+	direction := chi.URLParam(r, "type")
 
 	var response capture.Response
-	response.ID, err = strconv.ParseUint(r.Form.Get("id"), 10, 64)
-	if err != nil {
-		replyCode(w, http.StatusInternalServerError)
-		return
-	}
+	response.UUID = chi.URLParam(r, "uuid")
 
-	res := storage.Find(db.Cond{"id": response.ID})
+	res := storage.Find(db.Cond{"uuid": response.UUID})
 
 	res = res.Select(
 		"id",
@@ -124,13 +114,14 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		db.Raw("hex(request_body) AS request_body"),
 	)
 
-	if err = res.One(&response); err != nil {
+	if err := res.One(&response); err != nil {
 		log.Printf("res.One: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
 	}
 
 	var u *url.URL
+	var err error
 	if u, err = url.Parse(response.URL); err != nil {
 		log.Printf("url.Parse: %q", err)
 		replyCode(w, http.StatusInternalServerError)
@@ -185,23 +176,11 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 // getHandler service returns a request body.
 func getHandler(w http.ResponseWriter, r *http.Request) {
-	var err error
+	response := capture.ResponseMeta{}
+	response.UUID = chi.URLParam(r, "uuid")
 
-	if err = r.ParseForm(); err != nil {
-		log.Printf("ParseForm: %q", err)
-		replyCode(w, http.StatusInternalServerError)
-		return
-	}
-
-	var response capture.ResponseMeta
-	response.ID, err = strconv.ParseUint(r.Form.Get("id"), 10, 64)
-	if err != nil {
-		replyCode(w, http.StatusInternalServerError)
-		return
-	}
-
-	res := storage.Find(db.Cond{"id": response.ID})
-	if err = res.One(&response); err != nil {
+	res := storage.Find(db.Cond{"uuid": response.UUID})
+	if err := res.One(&response); err != nil {
 		log.Printf("res.One: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
@@ -210,8 +189,8 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 	replyJSON(w, response)
 }
 
-// pullHandler service serves paginated requests.
-func pullHandler(w http.ResponseWriter, r *http.Request) {
+// capturesHandler service serves paginated requests.
+func capturesHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var response pullResponse
 
@@ -282,13 +261,16 @@ func pullHandler(w http.ResponseWriter, r *http.Request) {
 // services.
 func startServices() error {
 
-	r := http.NewServeMux()
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
 
-	r.HandleFunc("/", rootHandler)
-	r.HandleFunc("/pull", pullHandler)
-	r.HandleFunc("/get", getHandler)
-	r.HandleFunc("/download", downloadHandler)
-	r.HandleFunc("/ws", wsHandler)
+	r.Route("/captures", func(r chi.Router) {
+		r.Get("/", capturesHandler)
+		r.Get("/{uuid}", getHandler)
+		r.Get("/{uuid}/download", downloadHandler)
+	})
+
+	//r.HandleFunc("/ws", wsHandler)
 
 	log.Printf("Starting (local) API server...")
 

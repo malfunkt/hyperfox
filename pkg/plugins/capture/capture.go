@@ -3,17 +3,19 @@ package capture
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"time"
 )
 
 type Header struct {
-	http.Header `json:",inline"`
+	http.Header
 }
 
 type ResponseMeta struct {
-	ID            uint64    `json:"id" db:"id,omitempty"`
+	ID            uint64    `json:"-" db:"id,omitempty"`
+	UUID          string    `json:"uuid" db:"uuid"`
 	Origin        string    `json:"origin" db:"origin"`
 	Method        string    `json:"method" db:"method"`
 	Status        int       `json:"status" db:"status"`
@@ -26,16 +28,16 @@ type ResponseMeta struct {
 	DateStart     time.Time `json:"date_start" db:"date_start"`
 	DateEnd       time.Time `json:"date_end" db:"date_end"`
 	TimeTaken     int64     `json:"time_taken" db:"time_taken"`
+
+	RequestHeader Header `json:"request_header,omitempty" db:"request_header"`
+	Header        Header `json:"header,omitempty" db:"header"`
 }
 
 type Response struct {
 	ResponseMeta `json:",inline" db:",inline"`
 
-	RequestHeader Header `json:"request_header,omitempty" db:"request_header"`
-	RequestBody   []byte `json:"request_body,omitempty" db:"request_body"`
-
-	Header Header `json:"header,omitempty" db:"header"`
-	Body   []byte `json:"body,omitempty" db:"body"`
+	RequestBody []byte `json:"request_body,omitempty" db:"request_body"`
+	Body        []byte `json:"body,omitempty" db:"body"`
 }
 
 func (h Header) MarshalDB() (interface{}, error) {
@@ -43,10 +45,14 @@ func (h Header) MarshalDB() (interface{}, error) {
 }
 
 func (h *Header) UnmarshalDB(data interface{}) error {
-	if s, ok := data.(string); ok {
-		return json.Unmarshal([]byte(s), &h.Header)
+	if s, ok := data.([]byte); ok {
+		return json.Unmarshal(s, &h.Header)
 	}
 	return nil
+}
+
+func (h Header) MarshalJSON() ([]byte, error) {
+	return json.Marshal(h.Header)
 }
 
 type CaptureWriteCloser struct {
@@ -71,6 +77,7 @@ func (cwc *CaptureWriteCloser) Close() error {
 
 	resp := &Response{
 		ResponseMeta: ResponseMeta{
+			UUID:          uuid.New().String(),
 			Origin:        cwc.res.Request.RemoteAddr,
 			Method:        cwc.res.Request.Method,
 			Status:        cwc.res.StatusCode,
@@ -83,11 +90,12 @@ func (cwc *CaptureWriteCloser) Close() error {
 			DateStart:     cwc.t,
 			DateEnd:       now,
 			TimeTaken:     now.UnixNano() - cwc.t.UnixNano(),
+
+			Header:        Header{cwc.res.Header},
+			RequestHeader: Header{cwc.res.Request.Header},
 		},
-		Header:        Header{cwc.res.Header},
-		Body:          cwc.Bytes(),
-		RequestHeader: Header{cwc.res.Request.Header},
-		RequestBody:   reqbody.Bytes(),
+		Body:        cwc.Bytes(),
+		RequestBody: reqbody.Bytes(),
 	}
 
 	cwc.resp <- resp
