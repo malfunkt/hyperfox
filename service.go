@@ -53,19 +53,105 @@ const (
 )
 
 const (
-	pageSize         = 50
-	directionRequest = `req`
+	pageSize = 50
 )
 
 type pullResponse struct {
-	Requests []capture.ResponseMeta `json:"requests"`
-	Pages    uint                   `json:"pages"`
-	Page     uint                   `json:"page"`
+	Requests []capture.RecordMeta `json:"requests"`
+	Pages    uint                 `json:"pages"`
+	Page     uint                 `json:"page"`
 }
 
 func replyCode(w http.ResponseWriter, httpCode int) {
 	w.WriteHeader(httpCode)
 	_, _ = w.Write([]byte(http.StatusText(httpCode)))
+}
+
+type writeOption uint8
+
+const (
+	writeNone         writeOption = 0
+	writeWire                     = 1
+	writeEmbed                    = 2
+	writeRequestBody              = 4
+	writeResponseBody             = 8
+)
+
+func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record, opts writeOption) {
+	var (
+		optRequestBody  = opts&writeRequestBody > 0
+		optResponseBody = opts&writeResponseBody > 0
+		optWire         = opts&writeWire > 0
+		optEmbed        = opts&writeEmbed > 0
+	)
+
+	if opts == writeNone {
+		return
+	}
+
+	if optRequestBody && optResponseBody {
+		// we should never have both options enabled at the same time.
+		replyCode(w, http.StatusInternalServerError)
+		return
+	}
+
+	u, err := url.Parse(record.URL)
+	if err != nil {
+		log.Printf("url.Parse: %w", err)
+		replyCode(w, http.StatusInternalServerError)
+		return
+	}
+
+	basename := u.Host + "-" + path.Base(u.Path)
+	basename = reUnsafeFile.ReplaceAllString(basename, "-")
+	basename = strings.Trim(reRepeatedDash.ReplaceAllString(basename, "-"), "-")
+	if path.Ext(basename) == "" {
+		basename = basename + ".txt"
+	}
+
+	buf := bytes.NewBuffer(nil)
+
+	if optWire {
+		var headers http.Header
+		if optRequestBody {
+			headers = record.RequestHeader.Header
+		}
+		if optResponseBody {
+			headers = record.Header.Header
+		}
+		for k, vv := range headers {
+			for _, v := range vv {
+				buf.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+			}
+		}
+		buf.WriteString("\r\n")
+	}
+
+	if optRequestBody || optResponseBody {
+
+		if optRequestBody {
+			buf.Write(record.RequestBody)
+		}
+		if optResponseBody {
+			buf.Write(record.Body)
+		}
+
+		if optEmbed {
+			embedContentType := "text/plain; charset=utf-8"
+			w.Header().Set(
+				"Content-Type",
+				embedContentType,
+			)
+			w.Write(buf.Bytes())
+		} else {
+			w.Header().Set(
+				"Content-Disposition",
+				fmt.Sprintf(`attachment; filename="%s"`, basename),
+			)
+			http.ServeContent(w, r, "", record.DateEnd, bytes.NewReader(buf.Bytes()))
+		}
+	}
+
 }
 
 func replyJSON(w http.ResponseWriter, data interface{}) {
@@ -85,108 +171,102 @@ func replyJSON(w http.ResponseWriter, data interface{}) {
 	_, _ = w.Write(buf)
 }
 
-func rootHandler(w http.ResponseWriter, r *http.Request) {
-	replyCode(w, http.StatusOK)
-}
+func getCaptureRecord(uuid string) (*capture.Record, error) {
+	var record capture.Record
 
-// downloadHandler provides a downloadable document given its ID.
-func downloadHandler(w http.ResponseWriter, r *http.Request) {
-	wireFormat := false
-	if chi.URLParam(r, "wire") != "" {
-		wireFormat = true
-	}
-
-	direction := chi.URLParam(r, "type")
-
-	var response capture.Response
-	response.UUID = chi.URLParam(r, "uuid")
-
-	res := storage.Find(db.Cond{"uuid": response.UUID})
-
-	res = res.Select(
-		"id",
-		"url",
+	res := storage.Find(
+		db.Cond{"uuid": uuid},
+	).Select(
+		"uuid",
+		"origin",
 		"method",
+		"status",
+		"content_type",
+		"content_length",
+		"host",
+		"url",
+		"path",
+		"scheme",
+		"date_start",
+		"date_end",
+		"time_taken",
 		"header",
 		"request_header",
-		"date_end",
 		db.Raw("hex(body) AS body"),
 		db.Raw("hex(request_body) AS request_body"),
 	)
 
-	if err := res.One(&response); err != nil {
-		log.Printf("res.One: %q", err)
-		replyCode(w, http.StatusInternalServerError)
-		return
+	if err := res.One(&record); err != nil {
+		return nil, err
 	}
 
-	var u *url.URL
-	var err error
-	if u, err = url.Parse(response.URL); err != nil {
-		log.Printf("url.Parse: %q", err)
-		replyCode(w, http.StatusInternalServerError)
-		return
-	}
-
-	basename := u.Host + "-" + path.Base(u.Path)
-	basename = reUnsafeFile.ReplaceAllString(basename, "-")
-	basename = strings.Trim(reRepeatedDash.ReplaceAllString(basename, "-"), "-")
-	if path.Ext(basename) == "" {
-		basename = basename + ".txt"
-	}
-
-	var body []byte
-	var headers http.Header
-
-	if direction == directionRequest {
-		if body, err = hex.DecodeString(string(response.RequestBody)); err != nil {
-			log.Printf("url.Parse: %q", err)
-			replyCode(w, http.StatusInternalServerError)
-			return
+	{
+		body, err := hex.DecodeString(string(record.RequestBody))
+		if err != nil {
+			return nil, err
 		}
-		headers = response.RequestHeader.Header
-	} else {
-		if body, err = hex.DecodeString(string(response.Body)); err != nil {
-			log.Printf("url.Parse: %q", err)
-			replyCode(w, http.StatusInternalServerError)
-			return
-		}
-		headers = response.Header.Header
+		record.RequestBody = body
 	}
 
-	if wireFormat {
-		buf := bytes.NewBuffer(nil)
-		for k, vv := range headers {
-			for _, v := range vv {
-				buf.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
-			}
+	{
+		body, err := hex.DecodeString(string(record.Body))
+		if err != nil {
+			return nil, err
 		}
-		buf.WriteString("\r\n")
-
-		w.Header().Set("Content-Disposition", `attachment; filename="`+basename+`"`)
-		buf.Write(body)
-
-		http.ServeContent(w, r, "", response.DateEnd, bytes.NewReader(buf.Bytes()))
-		return
+		record.Body = body
 	}
 
-	w.Header().Set("Content-Disposition", `attachment; filename="`+basename+`"`)
-	http.ServeContent(w, r, basename, response.DateEnd, bytes.NewReader(body))
+	return &record, nil
 }
 
-// getHandler service returns a request body.
-func getHandler(w http.ResponseWriter, r *http.Request) {
-	response := capture.ResponseMeta{}
-	response.UUID = chi.URLParam(r, "uuid")
+func recordMetaHandler(w http.ResponseWriter, r *http.Request) {
+	uuid := chi.URLParam(r, "uuid")
 
-	res := storage.Find(db.Cond{"uuid": response.UUID})
-	if err := res.One(&response); err != nil {
-		log.Printf("res.One: %q", err)
+	record, err := getCaptureRecord(uuid)
+	if err != nil {
+		log.Printf("getCaptureRecord: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
 	}
 
-	replyJSON(w, response)
+	replyJSON(w, record.RecordMeta)
+}
+
+func recordHandler(w http.ResponseWriter, r *http.Request, opts writeOption) {
+	uuid := chi.URLParam(r, "uuid")
+
+	record, err := getCaptureRecord(uuid)
+	if err != nil {
+		log.Printf("getCaptureRecord: %q", err)
+		replyCode(w, http.StatusInternalServerError)
+		return
+	}
+
+	replyBinary(w, r, record, opts)
+}
+
+func requestContentHandler(w http.ResponseWriter, r *http.Request) {
+	recordHandler(w, r, writeRequestBody)
+}
+
+func requestWireHandler(w http.ResponseWriter, r *http.Request) {
+	recordHandler(w, r, writeRequestBody|writeWire)
+}
+
+func requestEmbedHandler(w http.ResponseWriter, r *http.Request) {
+	recordHandler(w, r, writeRequestBody|writeEmbed)
+}
+
+func responseContentHandler(w http.ResponseWriter, r *http.Request) {
+	recordHandler(w, r, writeResponseBody)
+}
+
+func responseWireHandler(w http.ResponseWriter, r *http.Request) {
+	recordHandler(w, r, writeResponseBody|writeWire)
+}
+
+func responseEmbedHandler(w http.ResponseWriter, r *http.Request) {
+	recordHandler(w, r, writeResponseBody|writeEmbed)
 }
 
 // capturesHandler service serves paginated requests.
@@ -194,24 +274,17 @@ func capturesHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var response pullResponse
 
-	if err = r.ParseForm(); err != nil {
-		log.Printf("ParseForm: %q", err)
-		replyCode(w, http.StatusInternalServerError)
-		return
-	}
-
-	q := r.Form.Get("q")
+	q := chi.URLParam(r, "q")
 
 	q = reUnsafeChars.ReplaceAllString(q, " ")
 	q = reRepeatedBlank.ReplaceAllString(q, " ")
 
 	{
-		page, err := strconv.ParseUint(r.Form.Get("page"), 10, 64)
+		page, err := strconv.ParseUint(chi.URLParam(r, "page"), 10, 64)
 		if err == nil {
 			response.Page = uint(page)
 		}
 	}
-
 	if response.Page < 1 {
 		response.Page = 1
 	}
@@ -264,10 +337,24 @@ func startServices() error {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	r.Route("/captures", func(r chi.Router) {
+	r.Route("/records", func(r chi.Router) {
 		r.Get("/", capturesHandler)
-		r.Get("/{uuid}", getHandler)
-		r.Get("/{uuid}/download", downloadHandler)
+
+		r.Route("/{uuid}", func(r chi.Router) {
+			r.Get("/", recordMetaHandler)
+
+			r.Route("/request", func(r chi.Router) {
+				r.Get("/", requestContentHandler)
+				r.Get("/raw", requestWireHandler)
+				r.Get("/embed", requestEmbedHandler)
+			})
+
+			r.Route("/response", func(r chi.Router) {
+				r.Get("/", responseContentHandler)
+				r.Get("/raw", responseWireHandler)
+				r.Get("/embed", responseEmbedHandler)
+			})
+		})
 	})
 
 	//r.HandleFunc("/ws", wsHandler)

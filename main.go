@@ -108,20 +108,20 @@ func main() {
 	p.AddLogger(logger.Stdout{})
 
 	// Attaching capture tool.
-	res := make(chan *capture.Response, 256)
+	res := make(chan *capture.Record, 256)
 
 	p.AddBodyWriteCloser(capture.New(res))
 
 	// Saving captured data with a goroutine.
-	go func(res chan *capture.Response) {
+	go func(res chan *capture.Record) {
 		for r := range res {
-			go func(r *capture.Response) {
+			go func(r *capture.Record) {
 				id, err := storage.Insert(r)
 				if err != nil {
 					log.Printf("Failed to save to database: %s", err)
 				}
-				r.ResponseMeta.ID = uint64(id.(int64))
-				if err := wsBroadcast(r.ResponseMeta); err != nil {
+				r.RecordMeta.ID = uint64(id.(int64))
+				if err := wsBroadcast(r.RecordMeta); err != nil {
 					log.Print("wsBroadcast: ", err)
 				}
 			}(r)

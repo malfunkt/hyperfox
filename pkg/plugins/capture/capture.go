@@ -13,7 +13,7 @@ type Header struct {
 	http.Header
 }
 
-type ResponseMeta struct {
+type RecordMeta struct {
 	ID            uint64    `json:"-" db:"id,omitempty"`
 	UUID          string    `json:"uuid" db:"uuid"`
 	Origin        string    `json:"origin" db:"origin"`
@@ -33,8 +33,8 @@ type ResponseMeta struct {
 	Header        Header `json:"header,omitempty" db:"header"`
 }
 
-type Response struct {
-	ResponseMeta `json:",inline" db:",inline"`
+type Record struct {
+	RecordMeta `json:",inline" db:",inline"`
 
 	RequestBody []byte `json:"request_body,omitempty" db:"request_body"`
 	Body        []byte `json:"body,omitempty" db:"body"`
@@ -57,7 +57,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 
 type CaptureWriteCloser struct {
 	res  *http.Response
-	resp chan *Response
+	resp chan *Record
 	t    time.Time
 	bytes.Buffer
 }
@@ -75,8 +75,8 @@ func (cwc *CaptureWriteCloser) Close() error {
 
 	now := time.Now()
 
-	resp := &Response{
-		ResponseMeta: ResponseMeta{
+	resp := &Record{
+		RecordMeta: RecordMeta{
 			UUID:          uuid.New().String(),
 			Origin:        cwc.res.Request.RemoteAddr,
 			Method:        cwc.res.Request.Method,
@@ -104,10 +104,10 @@ func (cwc *CaptureWriteCloser) Close() error {
 }
 
 type Capture struct {
-	resp chan *Response
+	resp chan *Record
 }
 
-func New(resp chan *Response) *Capture {
+func New(resp chan *Record) *Capture {
 	return &Capture{resp: resp}
 }
 
