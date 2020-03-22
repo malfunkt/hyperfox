@@ -30,7 +30,6 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -53,13 +52,13 @@ const (
 )
 
 const (
-	pageSize = 50
+	defaultPageSize = uint(10)
 )
 
 type pullResponse struct {
-	Requests []capture.RecordMeta `json:"requests"`
-	Pages    uint                 `json:"pages"`
-	Page     uint                 `json:"page"`
+	Records []capture.RecordMeta `json:"records"`
+	Pages   uint                 `json:"pages"`
+	Page    uint                 `json:"page"`
 }
 
 func replyCode(w http.ResponseWriter, httpCode int) {
@@ -279,20 +278,41 @@ func capturesHandler(w http.ResponseWriter, r *http.Request) {
 	q = reUnsafeChars.ReplaceAllString(q, " ")
 	q = reRepeatedBlank.ReplaceAllString(q, " ")
 
+	page := uint(1)
 	{
-		page, err := strconv.ParseUint(chi.URLParam(r, "page"), 10, 64)
+		i, err := strconv.ParseUint(r.URL.Query().Get("page"), 10, 64)
 		if err == nil {
-			response.Page = uint(page)
+			page = uint(i)
 		}
 	}
-	if response.Page < 1 {
-		response.Page = 1
+
+	pageSize := defaultPageSize
+	{
+		i, err := strconv.ParseUint(r.URL.Query().Get("page_size"), 10, 64)
+		if err == nil {
+			pageSize = uint(i)
+		}
 	}
 
 	// Result set
-	res := storage.Find().OrderBy("id").
-		Limit(pageSize).
-		Offset(pageSize * int(response.Page-1))
+	res := storage.Find().
+		Select(
+			"id",
+			"uuid",
+			"origin",
+			"method",
+			"status",
+			"content_type",
+			"content_length",
+			"host",
+			"url",
+			"path",
+			"scheme",
+			"date_start",
+			"date_end",
+			"time_taken",
+		).
+		OrderBy("id")
 
 	if q != "" {
 		terms := strings.Split(q, " ")
@@ -315,17 +335,18 @@ func capturesHandler(w http.ResponseWriter, r *http.Request) {
 		res = res.Where(conds)
 	}
 
+	res = res.Paginate(pageSize).Page(page)
+
 	// Pulling information page.
-	if err = res.All(&response.Requests); err != nil {
+	if err = res.All(&response.Records); err != nil {
 		log.Printf("res.All: %q", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
 	}
 
 	// Getting total number of pages.
-	if c, err := res.Count(); err == nil {
-		response.Pages = uint(math.Ceil(float64(c) / float64(pageSize)))
-	}
+	response.Page = page
+	response.Pages, _ = res.TotalPages()
 
 	replyJSON(w, response)
 }
@@ -357,7 +378,7 @@ func startServices() error {
 		})
 	})
 
-	//r.HandleFunc("/ws", wsHandler)
+	r.HandleFunc("/live", liveHandler)
 
 	log.Printf("Starting (local) API server...")
 

@@ -20,7 +20,7 @@ func init() {
 	wsUpgrader.CheckOrigin = func(r *http.Request) bool { return true }
 }
 
-func wsHandler(w http.ResponseWriter, r *http.Request) {
+func liveHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
