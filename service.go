@@ -273,7 +273,7 @@ func capturesHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var response pullResponse
 
-	q := chi.URLParam(r, "q")
+	q := r.URL.Query().Get("q")
 
 	q = reUnsafeChars.ReplaceAllString(q, " ")
 	q = reRepeatedBlank.ReplaceAllString(q, " ")
