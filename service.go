@@ -28,15 +28,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	//"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
 	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 	_ "github.com/malfunkt/hyperfox/ui/statik"
+	"github.com/mdp/qrterminal/v3"
 	"github.com/pkg/browser"
 	"github.com/rakyll/statik/fs"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -54,13 +57,12 @@ var (
 var serviceCookie string
 
 func init() {
-	cookie := make([]byte, 10)
+	cookie := make([]byte, 16)
 	_, err := rand.Read(cookie)
 	if err != nil {
 		log.Fatal("rand.Read: ", err)
 	}
 	serviceCookie = fmt.Sprintf("%x", string(cookie))
-	serviceCookie = "AAA"
 }
 
 const (
@@ -389,7 +391,7 @@ func authMiddleware(next http.Handler) http.Handler {
 
 func apiServer() (string, error) {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	//r.Use(middleware.Logger)
 
 	// Basic CORS
 	// for more ideas, see: https://developer.github.com/v3/#cross-origin-resource-sharing
@@ -469,6 +471,16 @@ func uiServer(apiAddr string) (string, error) {
 	return addr, nil
 }
 
+func localAddr() (string, error) {
+	conn, err := net.Dial("udp4", "1.1.1.1:53")
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	return conn.LocalAddr().(*net.UDPAddr).IP.String(), nil
+}
+
 // startServices starts an http server that provides websocket and rest
 // services.
 func startServices() error {
@@ -491,6 +503,18 @@ func startServices() error {
 	}
 
 	log.Printf("Watch live capture at %s", uiAddrWithToken)
+
+	addr, err := localAddr()
+	if err == nil {
+		localAddrWithToken := fmt.Sprintf("http://%s:%d/?source=%s:%d&auth=%s",
+			addr,
+			serviceUIPort,
+			addr,
+			serviceAPIPort,
+			serviceCookie,
+		)
+		qrterminal.GenerateHalfBlock(localAddrWithToken, qrterminal.H, os.Stdout)
+	}
 
 	return err
 }
