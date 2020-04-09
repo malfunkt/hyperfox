@@ -23,14 +23,18 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
+	_ "github.com/malfunkt/hyperfox/ui/statik"
+	"github.com/pkg/browser"
+	"github.com/rakyll/statik/fs"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -47,8 +51,22 @@ var (
 	reRepeatedBlank = regexp.MustCompile(`\s+`)
 )
 
+var serviceCookie string
+
+func init() {
+	cookie := make([]byte, 10)
+	_, err := rand.Read(cookie)
+	if err != nil {
+		log.Fatal("rand.Read: ", err)
+	}
+	serviceCookie = fmt.Sprintf("%x", string(cookie))
+	serviceCookie = "AAA"
+}
+
 const (
 	serviceBindHost = `0.0.0.0`
+	serviceAPIPort  = 4891
+	serviceUIPort   = 1984
 )
 
 const (
@@ -351,12 +369,43 @@ func capturesHandler(w http.ResponseWriter, r *http.Request) {
 	replyJSON(w, response)
 }
 
-// startServices starts an http server that provides websocket and rest
-// services.
-func startServices() error {
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth == "" {
+			auth = r.URL.Query().Get("auth")
+		}
+		if auth != "" {
+			chunks := strings.SplitN(auth, " ", 2)
+			auth = chunks[len(chunks)-1]
+			if auth == serviceCookie {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusForbidden)
+	})
+}
 
+func apiServer() (string, error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+
+	// Basic CORS
+	// for more ideas, see: https://developer.github.com/v3/#cross-origin-resource-sharing
+	cors := cors.New(cors.Options{
+		// AllowedOrigins: []string{"https://foo.com"}, // Use this to allow specific origin hosts
+		AllowedOrigins: []string{"*"},
+		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	})
+	r.Use(cors.Handler)
+
+	r.Use(authMiddleware)
 
 	r.Route("/records", func(r chi.Router) {
 		r.Get("/", capturesHandler)
@@ -380,17 +429,7 @@ func startServices() error {
 
 	r.HandleFunc("/live", liveHandler)
 
-	log.Printf("Starting (local) API server...")
-
-	// Looking for a port to listen to.
-	ln, err := net.Listen("tcp", serviceBindHost+":8899")
-	if err != nil {
-		log.Fatal("net.Listen: ", err)
-	}
-
-	addr := fmt.Sprintf("%s:%d", serviceBindHost, ln.Addr().(*net.TCPAddr).Port)
-	log.Printf("Watch live capture at http://live.hyperfox.org/#/?source=%s", addr)
-
+	addr := fmt.Sprintf("%s:%d", serviceBindHost, serviceAPIPort)
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: r,
@@ -398,10 +437,60 @@ func startServices() error {
 
 	// Serving API.
 	go func() {
-		if err := srv.Serve(ln); err != nil {
-			panic(err.Error())
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalf("ListenAndServe: %v", err)
+			return
 		}
 	}()
+
+	return addr, nil
+}
+
+func uiServer(apiAddr string) (string, error) {
+	statikFS, err := fs.New()
+	if err != nil {
+		return "", err
+	}
+
+	addr := fmt.Sprintf("%s:%d", serviceBindHost, serviceUIPort)
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: http.FileServer(statikFS),
+	}
+
+	// Serving API.
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalf("ListenAndServe: %v", err)
+			return
+		}
+	}()
+
+	return addr, nil
+}
+
+// startServices starts an http server that provides websocket and rest
+// services.
+func startServices() error {
+
+	apiAddr, err := apiServer()
+	if err != nil {
+		log.Fatal("error starting API server: ", err)
+	}
+	log.Printf("started API server at %v", apiAddr)
+
+	uiAddr, err := uiServer(apiAddr)
+	if err != nil {
+		log.Fatal("error starting UI server: ", err)
+	}
+	log.Printf("started UI server at %v", uiAddr)
+
+	uiAddrWithToken := fmt.Sprintf("http://%s/?source=%s&auth=%s", uiAddr, apiAddr, serviceCookie)
+	if err := browser.OpenURL(uiAddrWithToken); err != nil {
+		log.Printf("failed to open browser: %v", err)
+	}
+
+	log.Printf("Watch live capture at %s", uiAddrWithToken)
 
 	return err
 }

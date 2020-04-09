@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -74,6 +75,8 @@ func (cwc *CaptureWriteCloser) Close() error {
 	}
 
 	now := time.Now()
+	log.Printf("UNIX1: %v", now.UnixNano())
+	log.Printf("UNIX2: %v", cwc.t.UnixNano())
 
 	resp := &Record{
 		RecordMeta: RecordMeta{

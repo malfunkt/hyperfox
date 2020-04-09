@@ -36,26 +36,26 @@ const listenHTTPAddr = `127.0.0.1:37400`
 
 var px *proxy.Proxy
 
-type testResponseWriter struct {
+type testRecordWriter struct {
 	header http.Header
 	buf    *bytes.Buffer
 	status int
 }
 
-func (rw *testResponseWriter) Header() http.Header {
+func (rw *testRecordWriter) Header() http.Header {
 	return rw.header
 }
 
-func (rw *testResponseWriter) Write(buf []byte) (int, error) {
+func (rw *testRecordWriter) Write(buf []byte) (int, error) {
 	return rw.buf.Write(buf)
 }
 
-func (rw *testResponseWriter) WriteHeader(i int) {
+func (rw *testRecordWriter) WriteHeader(i int) {
 	rw.status = i
 }
 
-func newTestResponseWriter() *testResponseWriter {
-	rw := &testResponseWriter{
+func newTestRecordWriter() *testRecordWriter {
+	rw := &testRecordWriter{
 		header: http.Header{},
 		buf:    bytes.NewBuffer(nil),
 	}
@@ -81,7 +81,7 @@ func TestWriteCloser(t *testing.T) {
 	var req *http.Request
 	var err error
 
-	res := make(chan *Response, 10)
+	res := make(chan *Record, 10)
 
 	px.AddBodyWriteCloser(New(res))
 
@@ -100,7 +100,7 @@ func TestWriteCloser(t *testing.T) {
 
 	for i := range urls {
 		// Creating a response writer.
-		wri := newTestResponseWriter()
+		wri := newTestRecordWriter()
 
 		// Creating a request
 		if req, err = http.NewRequest("GET", urls[i], nil); err != nil {
