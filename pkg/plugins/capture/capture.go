@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -60,7 +59,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 type CaptureWriteCloser struct {
 	res  *http.Response
 	resp chan *Record
-	t    time.Time
+	Time time.Time
 	bytes.Buffer
 }
 
@@ -76,8 +75,6 @@ func (cwc *CaptureWriteCloser) Close() error {
 	}
 
 	now := time.Now()
-	log.Printf("UNIX1: %v", now.UnixNano())
-	log.Printf("UNIX2: %v", cwc.t.UnixNano())
 
 	resp := &Record{
 		RecordMeta: RecordMeta{
@@ -91,9 +88,9 @@ func (cwc *CaptureWriteCloser) Close() error {
 			URL:           cwc.res.Request.URL.String(),
 			Scheme:        cwc.res.Request.URL.Scheme,
 			Path:          cwc.res.Request.URL.Path,
-			DateStart:     cwc.t,
+			DateStart:     cwc.Time,
 			DateEnd:       now,
-			TimeTaken:     now.UnixNano() - cwc.t.UnixNano(),
+			TimeTaken:     now.UnixNano() - cwc.Time.UnixNano(),
 
 			Header:        Header{cwc.res.Header},
 			RequestHeader: Header{cwc.res.Request.Header},
@@ -119,6 +116,6 @@ func (c *Capture) NewWriteCloser(res *http.Response) (io.WriteCloser, error) {
 	return &CaptureWriteCloser{
 		res:  res,
 		resp: c.resp,
-		t:    time.Now(),
+		Time: time.Now(),
 	}, nil
 }

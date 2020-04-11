@@ -32,8 +32,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/malfunkt/hyperfox/pkg/gencert"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 	"github.com/tv42/httpunix"
 )
 
@@ -201,6 +203,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	out.ProtoMinor = 1
 	out.Close = false
 
+	startTime := time.Now()
+
 	// Walking over directors.
 	for i := range p.directors {
 		if err := p.directors[i].Direct(out); err != nil {
@@ -262,6 +266,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Printf("WriteCloser: %q", err)
 			continue
 		}
+		w.(*capture.CaptureWriteCloser).Time = startTime
 		ws = append(ws, w)
 	}
 
