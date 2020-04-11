@@ -26,6 +26,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -48,32 +49,48 @@ import (
 )
 
 var (
+	flagUIAddr         = flag.String("ui-addr", "127.0.0.1:1984", "UI server address.")
+	flagAPIAddr        = flag.String("api-addr", "0.0.0.0:4891", "API server address.")
+	flagHeadless       = flag.Bool("headless", false, "Disable UI.")
+	flagDisableService = flag.Bool("disable-service", false, "Disable API service.")
+	flagDisableAPIAuth = flag.Bool("disable-api-auth", false, "Disable API authentication code.")
+)
+
+var (
 	reUnsafeChars   = regexp.MustCompile(`[^0-9a-zA-Z\s\.]`)
 	reUnsafeFile    = regexp.MustCompile(`[^0-9a-zA-Z-_]`)
 	reRepeatedDash  = regexp.MustCompile(`-+`)
 	reRepeatedBlank = regexp.MustCompile(`\s+`)
 )
 
-var serviceCookie string
-
-func init() {
-	cookie := make([]byte, 16)
-	_, err := rand.Read(cookie)
-	if err != nil {
-		log.Fatal("rand.Read: ", err)
-	}
-	serviceCookie = fmt.Sprintf("%x", string(cookie))
-}
+type writeOption uint8
 
 const (
-	serviceBindHost = `0.0.0.0`
-	serviceAPIPort  = 4891
-	serviceUIPort   = 1984
+	writeNone         writeOption = 0
+	writeWire         writeOption = 1
+	writeEmbed        writeOption = 2
+	writeRequestBody  writeOption = 4
+	writeResponseBody writeOption = 8
 )
 
 const (
 	defaultPageSize = uint(10)
 )
+
+var apiAuthToken string
+
+func init() {
+	cookie := make([]byte, 8)
+	_, err := rand.Read(cookie)
+	if err != nil {
+		log.Fatal("rand.Read: ", err)
+	}
+	apiAuthToken = fmt.Sprintf("%x", string(cookie))
+
+	// Disable debugging messages when unable to open a browser window.
+	browser.Stdout = nil
+	browser.Stderr = nil
+}
 
 type pullResponse struct {
 	Records []capture.RecordMeta `json:"records"`
@@ -85,16 +102,6 @@ func replyCode(w http.ResponseWriter, httpCode int) {
 	w.WriteHeader(httpCode)
 	_, _ = w.Write([]byte(http.StatusText(httpCode)))
 }
-
-type writeOption uint8
-
-const (
-	writeNone         writeOption = 0
-	writeWire         writeOption = 1
-	writeEmbed        writeOption = 2
-	writeRequestBody  writeOption = 4
-	writeResponseBody writeOption = 8
-)
 
 func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record, opts writeOption) {
 	var (
@@ -172,7 +179,6 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 			http.ServeContent(w, r, "", record.DateEnd, bytes.NewReader(buf.Bytes()))
 		}
 	}
-
 }
 
 func replyJSON(w http.ResponseWriter, data interface{}) {
@@ -382,7 +388,7 @@ func authMiddleware(next http.Handler) http.Handler {
 		if auth != "" {
 			chunks := strings.SplitN(auth, " ", 2)
 			auth = chunks[len(chunks)-1]
-			if auth == serviceCookie {
+			if auth == apiAuthToken {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -395,17 +401,12 @@ func apiServer() (string, error) {
 	r := chi.NewRouter()
 	//r.Use(middleware.Logger)
 
-	// Basic CORS
-	// for more ideas, see: https://developer.github.com/v3/#cross-origin-resource-sharing
 	cors := cors.New(cors.Options{
-		// AllowedOrigins: []string{"https://foo.com"}, // Use this to allow specific origin hosts
-		AllowedOrigins: []string{"*"},
-		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
+		MaxAge:           0,
 	})
 	r.Use(cors.Handler)
 
@@ -433,9 +434,8 @@ func apiServer() (string, error) {
 
 	r.HandleFunc("/live", liveHandler)
 
-	addr := fmt.Sprintf("%s:%d", serviceBindHost, serviceAPIPort)
 	srv := &http.Server{
-		Addr:    addr,
+		Addr:    *flagAPIAddr,
 		Handler: r,
 	}
 
@@ -447,7 +447,7 @@ func apiServer() (string, error) {
 		}
 	}()
 
-	return addr, nil
+	return *flagAPIAddr, nil
 }
 
 func uiServer(apiAddr string) (string, error) {
@@ -456,9 +456,8 @@ func uiServer(apiAddr string) (string, error) {
 		return "", err
 	}
 
-	addr := fmt.Sprintf("%s:%d", serviceBindHost, serviceUIPort)
 	srv := &http.Server{
-		Addr:    addr,
+		Addr:    *flagUIAddr,
 		Handler: http.FileServer(statikFS),
 	}
 
@@ -470,7 +469,7 @@ func uiServer(apiAddr string) (string, error) {
 		}
 	}()
 
-	return addr, nil
+	return *flagUIAddr, nil
 }
 
 func localAddr() (string, error) {
@@ -483,39 +482,57 @@ func localAddr() (string, error) {
 	return conn.LocalAddr().(*net.UDPAddr).IP.String(), nil
 }
 
+func displayQRCode(apiAddr string) error {
+	addr, err := localAddr()
+	if err != nil {
+		return err
+	}
+
+	_, uiPort, _ := net.SplitHostPort(*flagUIAddr)
+	_, apiPort, _ := net.SplitHostPort(*flagAPIAddr)
+
+	addrWithToken := fmt.Sprintf("http://%s:%s/?source=%s:%s&auth=%s",
+		addr,
+		uiPort,
+		addr,
+		apiPort,
+		apiAuthToken,
+	)
+	fmt.Println("")
+	log.Printf("Open Hyperfox UI on your mobile device:")
+	qrterminal.GenerateHalfBlock(addrWithToken, qrterminal.H, os.Stdout)
+	return nil
+}
+
 // startServices starts an http server that provides websocket and rest
 // services.
 func startServices() error {
-
 	apiAddr, err := apiServer()
 	if err != nil {
-		log.Fatal("error starting API server: ", err)
+		log.Fatal("Error starting API server: ", err)
 	}
-	log.Printf("started API server at %v", apiAddr)
+	log.Printf("Started API server at %v (auth token: %q)", apiAddr, apiAuthToken)
 
 	uiAddr, err := uiServer(apiAddr)
 	if err != nil {
-		log.Fatal("error starting UI server: ", err)
+		log.Fatal("Error starting UI server: ", err)
 	}
-	log.Printf("started UI server at %v", uiAddr)
+	log.Printf("Started UI server at %v", uiAddr)
 
-	uiAddrWithToken := fmt.Sprintf("http://%s/?source=%s&auth=%s", uiAddr, apiAddr, serviceCookie)
+	uiAddrWithToken := fmt.Sprintf("http://%s/?source=%s&auth=%s", uiAddr, apiAddr, apiAuthToken)
 	if err := browser.OpenURL(uiAddrWithToken); err != nil {
-		log.Printf("failed to open browser: %v", err)
+		log.Printf("Failed to open browser: %v", err)
 	}
+
+	fmt.Println("")
 
 	log.Printf("Watch live capture at %s", uiAddrWithToken)
 
-	addr, err := localAddr()
-	if err == nil {
-		localAddrWithToken := fmt.Sprintf("http://%s:%d/?source=%s:%d&auth=%s",
-			addr,
-			serviceUIPort,
-			addr,
-			serviceAPIPort,
-			serviceCookie,
-		)
-		qrterminal.GenerateHalfBlock(localAddrWithToken, qrterminal.H, os.Stdout)
+	host, _, _ := net.SplitHostPort(*flagUIAddr)
+	if host != "127.0.0.1" {
+		if err := displayQRCode(apiAddr); err != nil {
+			log.Printf("Failed to display QR code: %v", err)
+		}
 	}
 
 	return err

@@ -43,12 +43,12 @@ const (
 )
 
 var (
-	flagDatabase    = flag.String("d", "", "Path to database.")
-	flagAddress     = flag.String("l", defaultAddress, "Bind address.")
-	flagPort        = flag.Uint("p", defaultPort, "Port to bind to.")
-	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Port to bind to (SSL mode).")
-	flagSSLCertFile = flag.String("c", "", "Path to root CA certificate.")
-	flagSSLKeyFile  = flag.String("k", "", "Path to root CA key.")
+	flagDatabase    = flag.String("database", "", "Path to SQLite database.")
+	flagAddress     = flag.String("proxy-addr", defaultAddress, "IP address of the proxy.")
+	flagPort        = flag.Uint("proxy-http-port", defaultPort, "Port to bind to (plaintext mode).")
+	flagSSLPort     = flag.Uint("proxy-tls-port", defaultSSLPort, "Port to bind to (TLS mode). Requires --root-ca-cert and --root-ca-key.")
+	flagSSLCertFile = flag.String("root-ca-cert", "", "Path to root CA certificate.")
+	flagSSLKeyFile  = flag.String("root-ca-key", "", "Path to root CA key.")
 )
 
 var (
@@ -128,7 +128,7 @@ func main() {
 	}(res)
 
 	if err = startServices(); err != nil {
-		log.Fatal("startServices:", err)
+		log.Fatal("ui.Serve: ", err)
 	}
 
 	fmt.Println("")
@@ -141,7 +141,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-				log.Fatal("Failed to bind on the given interface (HTTP): ", err)
+				log.Fatal("Failed to bind to %s:%d (HTTP): ", *flagAddress, *flagPort, err)
 			}
 		}()
 	}
@@ -151,7 +151,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
-				log.Fatal("Failed to bind on the given interface (HTTPS): ", err)
+				log.Fatal("Failed to bind to %s:%d (HTTPs): ", *flagAddress, *flagSSLPort, err)
 			}
 		}()
 	}
