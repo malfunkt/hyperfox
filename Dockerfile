@@ -1,4 +1,4 @@
-FROM fedora:30
+FROM fedora:31
 
 RUN dnf install -y \
   # Commong tools
@@ -39,7 +39,7 @@ RUN dnf install -y dnf-plugins-core && \
 
 RUN mkdir -p /app/src/github.com/malfunkt/hyperfox
 
-ENV GO_TARBALL=https://dl.google.com/go/go1.12.9.linux-amd64.tar.gz
+ENV GO_TARBALL=https://dl.google.com/go/go1.14.2.linux-amd64.tar.gz
 
 RUN curl --silent -L $GO_TARBALL | tar -xzf - -C /usr/local
 
