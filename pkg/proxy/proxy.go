@@ -311,7 +311,7 @@ func (p *Proxy) Start(addr string) error {
 	}
 	p.ln = ln
 
-	log.Printf("Listening for incoming HTTP client requests on %s.\n", addr)
+	log.Printf("Listening for incoming HTTP client requests at %s.\n", addr)
 	if err := p.srv.Serve(ln); err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (p *Proxy) StartTLS(addr string) error {
 	}
 	p.ln = ln
 
-	log.Printf("Listening for incoming HTTPs client requests on %s.\n", addr)
+	log.Printf("Listening for incoming HTTPs client requests at %s.\n", addr)
 	if err := p.srv.ServeTLS(ln, cert, key); err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func (p *Proxy) StartUnix(proxy string, proxied string) error {
 	defer os.Remove(proxy)
 	p.ln = ln
 
-	log.Printf("Listening for incoming HTTP client requests on %s\n", proxy)
+	log.Printf("Listening for incoming HTTP client requests at %s\n", proxy)
 	return p.srv.Serve(ln)
 }
 

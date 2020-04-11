@@ -131,9 +131,8 @@ func main() {
 		if err = startServices(); err != nil {
 			log.Fatal("ui.Serve: ", err)
 		}
+		fmt.Println("")
 	}
-
-	fmt.Println("")
 
 	var wg sync.WaitGroup
 
