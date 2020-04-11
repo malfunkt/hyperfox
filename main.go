@@ -127,8 +127,10 @@ func main() {
 		}
 	}(res)
 
-	if err = startServices(); err != nil {
-		log.Fatal("ui.Serve: ", err)
+	if !*flagDisableService {
+		if err = startServices(); err != nil {
+			log.Fatal("ui.Serve: ", err)
+		}
 	}
 
 	fmt.Println("")
