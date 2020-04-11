@@ -99,6 +99,9 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 	basename := u.Host + "-" + path.Base(u.Path)
 	basename = reUnsafeFile.ReplaceAllString(basename, "-")
 	basename = strings.Trim(reRepeatedDash.ReplaceAllString(basename, "-"), "-")
+	if optWire {
+		basename = basename + "-raw"
+	}
 	if path.Ext(basename) == "" {
 		basename = basename + ".txt"
 	}

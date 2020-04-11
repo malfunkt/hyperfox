@@ -47,6 +47,19 @@ var (
 	flagDisableAPIAuth = flag.Bool("disable-api-auth", false, "Disable API authentication code.")
 )
 
+type catchAllFS struct {
+	fs http.FileSystem
+}
+
+func (ca catchAllFS) Open(name string) (http.File, error) {
+	file, err := ca.fs.Open(name)
+	if err != nil {
+		// fallback to index.html
+		return ca.fs.Open("/index.html")
+	}
+	return file, err
+}
+
 var apiAuthToken string
 
 func init() {
@@ -134,6 +147,7 @@ func apiServer() (string, error) {
 }
 
 func uiServer(apiAddr string) (string, error) {
+
 	statikFS, err := fs.New()
 	if err != nil {
 		return "", err
@@ -141,7 +155,7 @@ func uiServer(apiAddr string) (string, error) {
 
 	srv := &http.Server{
 		Addr:    *flagUIAddr,
-		Handler: http.FileServer(statikFS),
+		Handler: http.FileServer(&catchAllFS{statikFS}),
 	}
 
 	// Serving API.
