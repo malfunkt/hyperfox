@@ -34,13 +34,12 @@ import (
 	"upper.io/db.v3"
 )
 
-const version = "2.0.0"
+const Version = "2.0.0"
 
 const (
-	defaultAddress  = `0.0.0.0`
-	defaultPort     = uint(1080)
-	defaultSSLPort  = uint(10443)
-	proxyUnixSocket = `/tmp/hyperfox`
+	defaultAddress = `0.0.0.0`
+	defaultPort    = uint(1080)
+	defaultSSLPort = uint(10443)
 )
 
 var (
@@ -50,7 +49,6 @@ var (
 	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Port to bind to (SSL mode).")
 	flagSSLCertFile = flag.String("c", "", "Path to root CA certificate.")
 	flagSSLKeyFile  = flag.String("k", "", "Path to root CA key.")
-	flagUnixSocket  = flag.String("S", "", "Path to socket.")
 )
 
 var (
@@ -59,8 +57,7 @@ var (
 )
 
 func main() {
-	// Banner.
-	log.Printf("Hyperfox v%s // https://hyperfox.org\n", version)
+	log.Printf("Hyperfox v%s // https://hyperfox.org\n", Version)
 	log.Printf("By José Nieto.\n\n")
 
 	// Parsing command line flags.
@@ -68,7 +65,7 @@ func main() {
 
 	// Opening database.
 	var err error
-	sess, err = dbInit()
+	sess, err = initDB()
 	if err != nil {
 		log.Fatal("Failed to setup database: ", err)
 	}
@@ -76,7 +73,7 @@ func main() {
 
 	storage = sess.Collection(defaultCaptureCollection)
 	if !storage.Exists() {
-		log.Fatal("Storage table does not exist")
+		log.Fatalf("No such table %q", defaultCaptureCollection)
 	}
 
 	// Is SSL enabled?
@@ -155,16 +152,6 @@ func main() {
 			defer wg.Done()
 			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
 				log.Fatal("Failed to bind on the given interface (HTTPS): ", err)
-			}
-		}()
-	}
-
-	if *flagUnixSocket != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := p.StartUnix(proxyUnixSocket, *flagUnixSocket); err != nil {
-				log.Fatalf("Failed to bind on %s: %s", proxyUnixSocket, err)
 			}
 		}()
 	}

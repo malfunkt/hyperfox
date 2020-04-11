@@ -27,14 +27,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi"
-	//"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/cors"
-	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
-	_ "github.com/malfunkt/hyperfox/ui/statik"
-	"github.com/mdp/qrterminal/v3"
-	"github.com/pkg/browser"
-	"github.com/rakyll/statik/fs"
 	"log"
 	"net"
 	"net/http"
@@ -44,6 +36,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/go-chi/chi"
+	"github.com/go-chi/cors"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
+	_ "github.com/malfunkt/hyperfox/ui/statik"
+	"github.com/mdp/qrterminal/v3"
+	"github.com/pkg/browser"
+	"github.com/rakyll/statik/fs"
 	"upper.io/db.v3"
 )
 
@@ -90,10 +90,10 @@ type writeOption uint8
 
 const (
 	writeNone         writeOption = 0
-	writeWire                     = 1
-	writeEmbed                    = 2
-	writeRequestBody              = 4
-	writeResponseBody             = 8
+	writeWire         writeOption = 1
+	writeEmbed        writeOption = 2
+	writeRequestBody  writeOption = 4
+	writeResponseBody writeOption = 8
 )
 
 func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record, opts writeOption) {
@@ -116,7 +116,6 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 
 	u, err := url.Parse(record.URL)
 	if err != nil {
-		log.Printf("url.Parse: %w", err)
 		replyCode(w, http.StatusInternalServerError)
 		return
 	}
@@ -161,7 +160,10 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 				"Content-Type",
 				embedContentType,
 			)
-			w.Write(buf.Bytes())
+			_, err = w.Write(buf.Bytes())
+			if err != nil {
+				log.Printf("failed to send raw text: %v", err)
+			}
 		} else {
 			w.Header().Set(
 				"Content-Disposition",

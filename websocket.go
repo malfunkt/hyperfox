@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"sync"
-	//	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
+
+	"github.com/gorilla/websocket"
 )
 
 var (

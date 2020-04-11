@@ -84,3 +84,11 @@ release: require-version require-access-token
 		curl --silent -H "Content-Type: $$MIME_TYPE" --data-binary @bin/$$ASSET $$UPLOAD_URL > /dev/null && \
 		echo "-> $$ASSET OK." \
 	; done
+
+goimports:
+	find . -name '*.go' | grep -v vendor | xargs goimports -w
+
+linter:
+	golangci-lint run
+
+pedantic: goimports linter

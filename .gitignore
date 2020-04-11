@@ -1,4 +1,4 @@
-*.swp
+*.sw?
 *.db
 hyperfox
 certs/

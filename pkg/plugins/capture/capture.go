@@ -3,11 +3,12 @@ package capture
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/google/uuid"
 	"io"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Header struct {
