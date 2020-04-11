@@ -1,5 +1,6 @@
 *
-!lib
+!pkg
+!ui
 !ssl
 !*.go
 !go.mod
