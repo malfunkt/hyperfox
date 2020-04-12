@@ -67,11 +67,12 @@ output a QR code to make it easier to connect from mobile devices:
 hyperfox --db records.db --ui --ui-addr 192.168.1.23:1984
 ```
 
-### TLS mode (`--ca-cert` & `--ca-key`)
+### SSL/TLS mode (`--ca-cert` & `--ca-key`)
 
-TLS connections are secure end to end and protected from eavesdropping.
+SSL/TLS connections are secure end to end and protected from eavesdropping.
 Hyperfox won't be able to see anything happening between a client and a secure
-destination. This is only valid as long as the chain of trust remains untouched.
+destination. This is only valid as long as the chain of trust remains
+untouched.
 
 Let's suppose the client trusts a root CA controlled by Hyperfox, in this case
 Hyperfox will be able to be part of the chain of trust by issuing certificates
@@ -79,8 +80,8 @@ signed by the bogus CA.
 
 Examples of such bogus root CA can be found here:
 
-* [Hyperfox CA cert](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ssl/rootCA.crt)
-* [Hyperfox CA key](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ssl/rootCA.key)
+* [Hyperfox CA cert](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ca/rootCA.crt)
+* [Hyperfox CA key](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ca/rootCA.key)
 
 Use the `--ca-cert` and `--ca-key` flags to provide Hyperfox with the root CA
 certificate and key you'd like to use:
@@ -90,10 +91,11 @@ hyperfox --ca-cert rootCA.crt --ca-key rootCA.key
 ```
 
 the above command creates a special server and binds it to `127.0.0.1:10443`,
-this server waits for a TLS connection to arrive. When a new TLS hits in,
-Hyperfox uses the [SNI](https://en.wikipedia.org/wiki/Server_Name_Indication)
-extension to identify the destination nameserver and to create a SSL/TLS
-certificate for it, this certificate is signed with the root CA key.
+this server waits for a SSL/TLS connection to arrive. When a new SSL/TLS hits
+in, Hyperfox uses the
+[SNI](https://en.wikipedia.org/wiki/Server_Name_Indication) extension to
+identify the destination nameserver and to create a SSL/TLS certificate for it,
+this certificate is signed with the root CA key.
 
 ## Usage
 

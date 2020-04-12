@@ -30,13 +30,11 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
 	"github.com/malfunkt/hyperfox/pkg/gencert"
 	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
-	"github.com/tv42/httpunix"
 )
 
 const (
@@ -266,7 +264,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Printf("WriteCloser: %q", err)
 			continue
 		}
-		w.(*capture.CaptureWriteCloser).Time = startTime
+		if cwc, ok := w.(*capture.CaptureWriteCloser); ok {
+			cwc.Time = startTime
+		}
 		ws = append(ws, w)
 	}
 
@@ -366,36 +366,4 @@ func (p *Proxy) StartTLS(addr string) error {
 	}
 
 	return nil
-}
-
-// StartUnix creates an HTTP proxy server that listens on the proxy unix socket and forwards to proxied unix socket.
-func (p *Proxy) StartUnix(proxy string, proxied string) error {
-	p.srv = http.Server{
-		Addr:    "http+unix://proxy",
-		Handler: p,
-	}
-	u := &httpunix.Transport{}
-	u.RegisterLocation("proxied", proxied)
-	p.rt = u
-	p.AddDirector(UnixDirector{"http+unix://proxied"})
-
-	os.Remove(proxy)
-	ln, err := net.Listen("unix", proxy)
-	if err != nil {
-		return err
-	}
-	defer os.Remove(proxy)
-	p.ln = ln
-
-	log.Printf("Listening for incoming HTTP client requests at %s\n", proxy)
-	return p.srv.Serve(ln)
-}
-
-type UnixDirector struct {
-	URL string
-}
-
-func (d UnixDirector) Direct(req *http.Request) (err error) {
-	req.URL, err = url.Parse(d.URL + req.RequestURI)
-	return
 }

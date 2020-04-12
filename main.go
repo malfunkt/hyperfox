@@ -143,7 +143,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-				log.Fatal("Failed to bind to %s:%d (HTTP): ", *flagAddress, *flagPort, err)
+				log.Fatalf("Failed to bind to %s:%d (HTTP): %v", *flagAddress, *flagPort, err)
 			}
 		}()
 	}
@@ -153,7 +153,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagTLSPort)); err != nil {
-				log.Fatal("Failed to bind to %s:%d (HTTPs): ", *flagAddress, *flagTLSPort, err)
+				log.Fatalf("Failed to bind to %s:%d (TLS): %v", *flagAddress, *flagTLSPort, err)
 			}
 		}()
 	}

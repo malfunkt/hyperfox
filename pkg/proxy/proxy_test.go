@@ -5,26 +5,20 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
 var (
-	proxy      *Proxy
-	sslProxy   *Proxy
-	unixServer *UnixServer
-	unixProxy  *Proxy
+	proxy    *Proxy
+	sslProxy *Proxy
 )
 
 const (
 	listenHTTPAddr  = `127.0.0.1:13080`
 	listenHTTPsAddr = `127.0.0.1:13443`
-	listenUnixPath  = `/tmp/test_proxy`
-	serverUnixPath  = `/tmp/test_server`
 )
 
 type writeCloser struct {
@@ -127,80 +121,34 @@ func TestListenHTTP(t *testing.T) {
 	proxy = NewProxy()
 
 	go func() {
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Second * 5)
 		proxy.Stop()
 	}()
 
-	if err := proxy.Start(listenHTTPAddr); err != nil {
-		if !strings.Contains(err.Error(), "use of closed network connection") {
-			t.Fatal(err)
+	go func() {
+		if err := proxy.Start(listenHTTPAddr); err != nil {
+			if !strings.Contains(err.Error(), "use of closed network connection") {
+				t.Fatal(err)
+			}
 		}
-	}
-
+	}()
 }
 
 func TestListenHTTPs(t *testing.T) {
 	sslProxy = NewProxy()
 
 	go func() {
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Second * 5)
 		sslProxy.Stop()
 	}()
 
-	if err := sslProxy.StartTLS(listenHTTPsAddr); err != nil {
-		if !strings.Contains(err.Error(), "use of closed network connection") {
-			t.Fatal(err)
-		}
-	}
-}
-
-type UnixServer struct {
-	http.Server
-}
-
-func NewUnixServer() *UnixServer {
-	return &UnixServer{}
-}
-
-func (s *UnixServer) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
-	_, _ = w.Write([]byte("OK"))
-}
-
-func TestUnixListener(t *testing.T) {
-	unixServer = NewUnixServer()
-	unixServer.Addr = "http+unix://" + serverUnixPath
-	unixServer.Handler = unixServer
-
-	_ = os.Remove(serverUnixPath)
-	l, err := net.Listen("unix", serverUnixPath)
-	if err != nil {
-		t.Fatal(err)
-	}
 	go func() {
-		time.Sleep(time.Millisecond * 500)
-		_ = l.Close()
-	}()
-
-	if err := unixServer.Serve(l); err != nil {
-		if !strings.Contains(err.Error(), "use of closed network connection") {
-			t.Fatal(err)
+		if err := sslProxy.StartTLS(listenHTTPsAddr); err != nil {
+			if !strings.Contains(err.Error(), "use of closed network connection") {
+				t.Fatal(err)
+			}
 		}
-	}
-}
-
-func TestListenUnix(t *testing.T) {
-	unixProxy = NewProxy()
-
-	go func() {
-		time.Sleep(time.Millisecond * 500)
-		unixProxy.Stop()
 	}()
-
-	if err := unixProxy.StartUnix(listenUnixPath, serverUnixPath); err != nil {
-		if !strings.Contains(err.Error(), "use of closed network connection") {
-			t.Fatal(err)
-		}
-	}
 }
 
 func TestProxyResponse(t *testing.T) {
