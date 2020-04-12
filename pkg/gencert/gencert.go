@@ -1,4 +1,4 @@
-// Copyright (c) 2012-today José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Nieto, https://xiam.io
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -72,7 +72,7 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 
 	commonName, err = idna.ToASCII(commonName)
 	if err != nil {
-		return
+		return "", "", err
 	}
 
 	commonName = strings.ToLower(commonName)
@@ -85,7 +85,7 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 	// Attempt to verify certs.
 	if _, err = tls.LoadX509KeyPair(certFile, keyFile); err == nil {
 		// Keys already in place
-		return
+		return "", "", err
 	}
 
 	log.Printf("Creating SSL certificate for %s...", commonName)
@@ -96,7 +96,7 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		return
+		return "", "", err
 	}
 
 	template := x509.Certificate{
@@ -119,42 +119,46 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 
 	rootCA, err := tls.LoadX509KeyPair(rootCACert, rootCAKey)
 	if err != nil {
-		return
+		return "", "", err
 	}
 
 	if rootCA.Leaf, err = x509.ParseCertificate(rootCA.Certificate[0]); err != nil {
-		return
+		return "", "", err
 	}
 
 	var priv *rsa.PrivateKey
 	if priv, err = rsa.GenerateKey(rand.Reader, rsaBits); err != nil {
-		return
+		return "", "", err
 	}
 
 	var derBytes []byte
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &template, rootCA.Leaf, &priv.PublicKey, rootCA.PrivateKey); err != nil {
-		return
+		return "", "", err
 	}
 
 	if err = os.MkdirAll(destDir, 0755); err != nil {
-		return
+		return "", "", err
 	}
 
 	certOut, err := os.Create(certFile)
 	if err != nil {
-		return
+		return "", "", err
 	}
 
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		return "", "", err
+	}
 	certOut.Close()
 
 	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return
+		return "", "", err
 	}
 
-	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+		return "", "", err
+	}
 	keyOut.Close()
 
-	return
+	return certFile, keyFile, nil
 }

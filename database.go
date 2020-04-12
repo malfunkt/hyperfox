@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"upper.io/db.v3"
@@ -16,6 +15,7 @@ const (
 
 const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"id" INTEGER PRIMARY KEY,
+	"uuid" VARCHAR(36) NOT NULL,
 	"origin" VARCHAR(255),
 	"method" VARCHAR(10),
 	"status" INTEGER,
@@ -34,11 +34,10 @@ const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"time_taken" INTEGER
 )`
 
-func dbInit() (db.Database, error) {
-	var err error
-	var databaseName string
+func initDB() (db.Database, error) {
 
-	if *flagDatabase == "" {
+	databaseName := *flagDatabase
+	if databaseName == "" {
 		// Let's find an unused database file.
 		for i := 0; ; i++ {
 			databaseName = fmt.Sprintf(defaultDatabase, i)
@@ -48,9 +47,6 @@ func dbInit() (db.Database, error) {
 				break
 			}
 		}
-	} else {
-		// Use the provided database name.
-		databaseName = *flagDatabase
 	}
 
 	// Attempting to open database.
@@ -65,12 +61,13 @@ func dbInit() (db.Database, error) {
 		return sess, nil
 	}
 
-	log.Printf("Initializing database %s...", databaseName)
 	// Collection does not exists, let's create it.
 	// Execute CREATE TABLE.
 	if _, err = sess.Exec(collectionCreateSQL); err != nil {
 		return nil, err
 	}
+
+	sess.ClearCache()
 
 	return sess, nil
 }

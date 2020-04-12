@@ -2,118 +2,122 @@
 
 [![Build Status](https://travis-ci.org/malfunkt/hyperfox.svg?branch=master)](https://travis-ci.org/malfunkt/hyperfox)
 
-[Hyperfox][1] is a security tool for proxying and recording HTTP and HTTPs
-communications on a LAN.
+[Hyperfox][1] is a security auditing tool that proxies and records HTTP traffic
+between two points.
 
-![Hyperfox diagram](https://hyperfox.org/images/hyperfox-diagram.png)
+## Installation
 
-Hyperfox is capable of forging SSL certificates on the fly if you provide it
-with a root CA certificate and its corresponding key. If the target machine
-recognizes the root CA as trusted, then HTTPs traffic can be successfully
-decrypted, intercepted and recorded.
-
-![Hyperfox SSL](https://hyperfox.org/images/hyperfox-ssl.png)
-
-This is the development repository, check out the [https://hyperfox.org][1]
-site for usage information.
-
-## Get `hyperfox`
-
-You can install hyperfox to `/usr/local/bin` with the following command (requires
-admin privileges):
+You can install the latest version of hyperfox to `/usr/local/bin` with the
+following command (requires admin privileges):
 
 ```sh
 curl -sL 'https://raw.githubusercontent.com/malfunkt/hyperfox/master/install.sh' | sh
 ```
 
-You can also grab the latest release from our [releases
-page](https://github.com/malfunkt/hyperfox/releases) and install it manually into
-another location.
+You can also grab a release from our [releases
+page](https://github.com/malfunkt/hyperfox/releases) and install it manually.
 
-## Build it yourself
+## How does it work?
 
-In order to build `hyperfox` you'll need Go and a C compiler:
+Hyperfox creates a transparent HTTP proxy server and binds it to port 1080/TCP
+on localhost (`--addr 127.0.0.1 --http 1080`). The proxy server reads plaintext
+HTTP requests and redirects them to the target destination (the `Host` header
+is used to identify the destination), when the target destination replies,
+Hyperfox intercepts the response and forwards it to the original client.
 
-```sh
-go install github.com/malfunkt/hyperfox
+All HTTP communications between origin and destination are intercepted by
+Hyperfox and recorded on a SQLite database that is created automatically.
+Everytime Hyperfox starts, a new database is created (e.g.:
+`hyperfox-00123.db`). You can change this behaviour by explicitly providing a
+database name (e.g.: `--db traffic-log.db`).
+
+### User interface (`--ui`)
+
+Use the `--ui` parameter to enable Hyperfox UI. If you're running on a system
+with a GUI and a web browser, Hyperfox will attempt to open a browser window to
+display its UI:
+
+```
+hyperfox --db records.db --ui
 ```
 
-## Running hyperfox and arpfox on Linux
+The above command creates a web server that binds to 127.0.0.1:1984. If you'd
+like to change the bind address or port use the `--ui-addr` switch:
 
-The following example assumes that Hyperfox is installed on a Linux box (host)
-on which you have root access or sudo privileges and that the target machine is
-connected on the same LAN as the host.
-
-We are going to use the [arpfox][4] tool to alter the ARP table of the target
-machine in order to make it redirect its traffic to Hyperfox instead of to the
-legitimate LAN gateway. This is an ancient technique known as [ARP
-spoofing][6].
-
-First, identify both the local IP of the legitimate gateway and its matching
-network interface.
-
-```sh
-sudo route
-# Kernel IP routing table
-# Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
-# default         10.0.0.1        0.0.0.0         UG    1024   0        0 wlan0
-# ...
+```
+hyperfox --db records.db --ui --ui-addr 127.0.0.1:3000
 ```
 
-The interface in our example is called `wlan0` and the interface's gateway is
-`10.0.0.1`.
+Changing the UI server address is specially useful when Hyperfox is running on
+a remote or headless host and you'd like to see the UI from another host.
 
-```sh
-export HYPERFOX_GW=10.0.0.1
-export HYPERFOX_IFACE=wlan0
+Enabling the UI also enables a minimal REST API (at `127.0.0.1:4891`) that is
+consumed by the front-end application.
+
+Please note that Hyperfox's REST API is only protected by a randomly generated
+key that changes everytime Hyperfox starts, this might not be adecuate
+depending on your use case.
+
+#### Run Hyperfox UI on your mobile device
+
+When the `--ui-addr`parameter is different from `127.0.0.1` Hyperfox will
+output a QR code to make it easier to connect from mobile devices:
+
+```
+hyperfox --db records.db --ui --ui-addr 192.168.1.23:1984
 ```
 
-Then identify the IP address of the target, let's suppose it is `10.0.0.143`.
+### SSL/TLS mode (`--ca-cert` & `--ca-key`)
 
-```sh
-export HYPERFOX_TARGET=10.0.0.143
+SSL/TLS connections are secure end to end and protected from eavesdropping.
+Hyperfox won't be able to see anything happening between a client and a secure
+destination. This is only valid as long as the chain of trust remains
+untouched.
+
+Let's suppose the client trusts a root CA controlled by Hyperfox, in this case
+Hyperfox will be able to be part of the chain of trust by issuing certificates
+signed by the bogus CA.
+
+Examples of such bogus root CA can be found here:
+
+* [Hyperfox CA cert](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ca/rootCA.crt)
+* [Hyperfox CA key](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ca/rootCA.key)
+
+Use the `--ca-cert` and `--ca-key` flags to provide Hyperfox with the root CA
+certificate and key you'd like to use:
+
+```
+hyperfox --ca-cert rootCA.crt --ca-key rootCA.key
 ```
 
-Enable IP forwarding on the host for it to act (temporarily) as a common
-router.
+the above command creates a special server and binds it to `127.0.0.1:10443`,
+this server waits for a SSL/TLS connection to arrive. When a new SSL/TLS hits
+in, Hyperfox uses the
+[SNI](https://en.wikipedia.org/wiki/Server_Name_Indication) extension to
+identify the destination nameserver and to create a SSL/TLS certificate for it,
+this certificate is signed with the root CA key.
 
-```sh
-sudo sysctl -w net.ipv4.ip_forward=1
+## Usage
+
+### Via `/etc/hosts`
+
+```
+example.org 127.0.0.1
 ```
 
-Issue an `iptables` rule on the host to instruct it to redirect all traffic
-that goes to port 80 (commonly HTTP) to a local port where Hyperfox is
-listening to (1080).
-
-```sh
-sudo iptables -A PREROUTING -t nat -i $HYPERFOX_IFACE -p tcp --destination-port 80 -j REDIRECT --to-port 1080
+```
+hyperfox --http 80
 ```
 
-We're almost ready, prepare Hyperfox to receive plain HTTP traffic:
+### Via `arpfox` (ARPSpoofing)
 
-```sh
-hyperfox
-# ...
-# 2014/12/31 07:53:29 Listening for incoming HTTP client requests on 0.0.0.0:1080.
-```
+## Hacking
 
-Finally, run `arpfox` to alter the target's ARP table so it starts sending its
-network traffic to the host box:
-
-```sh
-sudo arpfox -i $HYPERFOX_IFACE -t $HYPERFOX_TARGET $HYPERFOX_GW
-```
-
-and watch the live traffic coming in.
-
-## Contributing to Hyperfox
-
-Sure, there's a lot of opportunity. Choose an [issue][7], fix it and send a
-pull request.
+Choose an [issue][3], fix it and send a pull request.
 
 ## License
 
-> Copyright (c) 2012-today José Carlos Nieto, https://menteslibres.net/xiam
+> Copyright (c) 2012-today José Nieto, https://xiam.io
 >
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the
@@ -135,9 +139,5 @@ pull request.
 > WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 [1]: https://hyperfox.org
-[2]: https://golang.org/doc/install
-[3]: https://en.wikipedia.org/wiki/Man-in-the-middle_attack
-[4]: https://github.com/malfunkt/arpfox
-[5]: http://git-scm.com
-[6]: https://en.wikipedia.org/wiki/ARP_spoofing
-[7]: https://github.com/malfunkt/hyperfox/issues
+[2]: https://en.wikipedia.org/wiki/Man-in-the-middle_attack
+[3]: https://github.com/malfunkt/hyperfox/issues

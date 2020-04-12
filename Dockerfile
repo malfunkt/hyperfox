@@ -1,4 +1,4 @@
-FROM fedora:27
+FROM fedora:31
 
 RUN dnf install -y \
   # Commong tools
@@ -37,9 +37,7 @@ RUN dnf install -y dnf-plugins-core && \
   dnf install -y arm-linux-gnueabi-{binutils,gcc,glibc} && \
   dnf clean packages
 
-RUN mkdir -p /app/src/github.com/malfunkt/hyperfox
-
-ENV GO_TARBALL=https://dl.google.com/go/go1.9.4.linux-amd64.tar.gz
+ENV GO_TARBALL=https://dl.google.com/go/go1.14.2.linux-amd64.tar.gz
 
 RUN curl --silent -L $GO_TARBALL | tar -xzf - -C /usr/local
 
@@ -47,18 +45,7 @@ ENV GOROOT /usr/local/go
 ENV GOPATH /app
 ENV PATH $PATH:$GOROOT/bin:$GOPATH/bin
 
-RUN go get github.com/mattn/go-sqlite3
-
-RUN CC=x86_64-w64-mingw32-gcc \
-	CGO_ENABLED=1 \
-	GOOS=windows \
-	GOARCH=amd64 \
-	go install github.com/mattn/go-sqlite3
-
-RUN CC=i686-w64-mingw32-gcc \
-	CGO_ENABLED=1 \
-	GOOS=windows \
-	GOARCH=386 \
-	go install github.com/mattn/go-sqlite3
-
 WORKDIR /app/src/github.com/malfunkt/hyperfox
+COPY . .
+
+RUN go mod vendor

@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Nieto, https://xiam.io
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -24,10 +24,11 @@ package logger
 import (
 	"bytes"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/malfunkt/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/pkg/proxy"
 )
 
 const listenHTTPAddr = `127.0.0.1:37400`
@@ -63,13 +64,16 @@ func newTestResponseWriter() *testResponseWriter {
 func TestListenHTTP(t *testing.T) {
 	px = proxy.NewProxy()
 
-	go func(t *testing.T) {
-		if err := px.Start(listenHTTPAddr); err != nil {
+	go func() {
+		time.Sleep(time.Millisecond * 100)
+		px.Stop()
+	}()
+
+	if err := px.Start(listenHTTPAddr); err != nil {
+		if !strings.Contains(err.Error(), "use of closed network connection") {
 			t.Fatal(err)
 		}
-	}(t)
-
-	time.Sleep(time.Millisecond * 100)
+	}
 }
 
 func TestLoggerInterface(t *testing.T) {

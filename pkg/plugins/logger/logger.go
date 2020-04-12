@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Nieto, https://xiam.io
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/malfunkt/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/pkg/proxy"
 )
 
 func chunk(value string) string {

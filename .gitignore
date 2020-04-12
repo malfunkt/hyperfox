@@ -1,6 +1,6 @@
-*.swp
+*.sw?
 *.db
 hyperfox
 certs/
 bin/
-vendor/*/
+vendor/

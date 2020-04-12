@@ -1,4 +1,4 @@
-// Copyright (c) 2012-today José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Nieto, https://xiam.io
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -30,20 +30,20 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
+	"time"
 
-	"github.com/malfunkt/hyperfox/lib/gencert"
-	"github.com/tv42/httpunix"
+	"github.com/malfunkt/hyperfox/pkg/gencert"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
 )
 
 const (
-	// EnvSSLKey defines the name for the environment variable that holds the
-	// root SSL key.
-	EnvSSLKey = `HYPERFOX_SSL_KEY`
-	// EnvSSLCert defines the name for the environment variable that holds the
-	// root SSL certificate..
-	EnvSSLCert = `HYPERFOX_SSL_CERT`
+	// EnvTLSKey defines the name for the environment variable that holds the
+	// root TLS key.
+	EnvTLSKey = `HYPERFOX_TLS_KEY`
+	// EnvTLSCert defines the name for the environment variable that holds the
+	// root TLS certificate..
+	EnvTLSCert = `HYPERFOX_TLS_CERT`
 )
 
 // BodyWriteCloser interface returns a io.WriteCloser where a copy of the
@@ -86,6 +86,7 @@ type Logger interface {
 // Proxy struct provides methods and properties for creating a proxy
 // programatically.
 type Proxy struct {
+	ln net.Listener
 	// Standard HTTP server
 	srv http.Server
 	// RoundTrip to proxied service
@@ -119,6 +120,14 @@ func (p *Proxy) Reset() {
 	p.directors = []Director{}
 	p.interceptors = []Interceptor{}
 	p.loggers = []Logger{}
+}
+
+// Stop terminates a running proxy
+func (p *Proxy) Stop() {
+	if p.ln == nil {
+		return
+	}
+	_ = p.ln.Close()
 }
 
 // NewProxiedRequest creates and returns a ProxiedRequest reference.
@@ -192,6 +201,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	out.ProtoMinor = 1
 	out.Close = false
 
+	startTime := time.Now()
+
 	// Walking over directors.
 	for i := range p.directors {
 		if err := p.directors[i].Direct(out); err != nil {
@@ -204,7 +215,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	bodyCopy := bytes.NewBuffer(nil)
 
 	if out.Body != nil {
-		io.Copy(io.MultiWriter(body, bodyCopy), out.Body)
+		if _, err := io.Copy(io.MultiWriter(body, bodyCopy), out.Body); err != nil {
+			log.Printf("io.Copy: %q", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		out.Body.Close()
 		out.Body = ioutil.NopCloser(body)
 	}
@@ -249,6 +264,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Printf("WriteCloser: %q", err)
 			continue
 		}
+		if cwc, ok := w.(*capture.CaptureWriteCloser); ok {
+			cwc.Time = startTime
+		}
 		ws = append(ws, w)
 	}
 
@@ -287,10 +305,17 @@ func (p *Proxy) Start(addr string) error {
 	}
 	p.rt = &http.Transport{}
 
-	log.Printf("Listening for incoming HTTP client requests on %s.\n", addr)
-	if err := p.srv.ListenAndServe(); err != nil {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
 		return err
 	}
+	p.ln = ln
+
+	log.Printf("Listening for incoming HTTP client requests at %s.\n", addr)
+	if err := p.srv.Serve(ln); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -324,45 +349,21 @@ func (p *Proxy) StartTLS(addr string) error {
 		},
 	}
 
-	log.Printf("Listening for incoming HTTPs client requests on %s.\n", addr)
+	cert, key := os.Getenv(EnvTLSCert), os.Getenv(EnvTLSKey)
 
-	gencert.SetRootCACert(os.Getenv(EnvSSLCert))
-	gencert.SetRootCAKey(os.Getenv(EnvSSLKey))
+	gencert.SetRootCACert(cert)
+	gencert.SetRootCAKey(key)
 
-	if err := p.srv.ListenAndServeTLS(os.Getenv(EnvSSLCert), os.Getenv(EnvSSLKey)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// StartUnix creates an HTTP proxy server that listens on the proxy unix socket and forwards to proxied unix socket.
-func (p *Proxy) StartUnix(proxy string, proxied string) error {
-	p.srv = http.Server{
-		Addr:    "http+unix://proxy",
-		Handler: p,
-	}
-	u := &httpunix.Transport{}
-	u.RegisterLocation("proxied", proxied)
-	p.rt = u
-	p.AddDirector(UnixDirector{"http+unix://proxied"})
-
-	log.Printf("Listening for incoming HTTP client requests on %s\n", proxy)
-
-	os.Remove(proxy)
-	l, err := net.Listen("unix", proxy)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	defer l.Close()
-	defer os.Remove(proxy)
-	return p.srv.Serve(l)
-}
+	p.ln = ln
 
-type UnixDirector struct {
-	URL string
-}
+	log.Printf("Listening for incoming HTTPs client requests at %s.\n", addr)
+	if err := p.srv.ServeTLS(ln, cert, key); err != nil {
+		return err
+	}
 
-func (d UnixDirector) Direct(req *http.Request) (err error) {
-	req.URL, err = url.Parse(d.URL + req.RequestURI)
-	return
+	return nil
 }

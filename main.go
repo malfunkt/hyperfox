@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2014 José Carlos Nieto, https://menteslibres.net/xiam
+// Copyright (c) 2012-today José Nieto, https://xiam.io
 //
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -28,29 +28,28 @@ import (
 	"os"
 	"sync"
 
-	"github.com/malfunkt/hyperfox/lib/plugins/capture"
-	"github.com/malfunkt/hyperfox/lib/plugins/logger"
-	"github.com/malfunkt/hyperfox/lib/proxy"
+	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
+	"github.com/malfunkt/hyperfox/pkg/plugins/logger"
+	"github.com/malfunkt/hyperfox/pkg/proxy"
 	"upper.io/db.v3"
 )
 
-const version = "1.9.8"
+const Version = "2.0.0"
 
 const (
-	defaultAddress  = `0.0.0.0`
-	defaultPort     = uint(1080)
-	defaultSSLPort  = uint(10443)
-	proxyUnixSocket = `/tmp/hyperfox`
+	defaultAddress = `127.0.0.1`
+	defaultPort    = uint(1080)
+	defaultTLSPort = uint(10443)
 )
 
 var (
-	flagDatabase    = flag.String("d", "", "Path to database.")
-	flagAddress     = flag.String("l", defaultAddress, "Bind address.")
-	flagPort        = flag.Uint("p", defaultPort, "Port to bind to.")
-	flagSSLPort     = flag.Uint("s", defaultSSLPort, "Port to bind to (SSL mode).")
-	flagSSLCertFile = flag.String("c", "", "Path to root CA certificate.")
-	flagSSLKeyFile  = flag.String("k", "", "Path to root CA key.")
-	flagUnixSocket  = flag.String("S", "", "Path to socket.")
+	flagHelp        = flag.Bool("help", false, "Displays help.")
+	flagDatabase    = flag.String("db", "", "Path to SQLite database.")
+	flagAddress     = flag.String("addr", defaultAddress, "Bind address.")
+	flagPort        = flag.Uint("http", defaultPort, "Bind port (HTTP mode).")
+	flagTLSPort     = flag.Uint("https", defaultTLSPort, "Bind port (SSL/TLS mode). Requires --ca-cert and --ca-key.")
+	flagTLSCertFile = flag.String("ca-cert", "", "Path to root CA certificate.")
+	flagTLSKeyFile  = flag.String("ca-key", "", "Path to root CA key.")
 )
 
 var (
@@ -59,16 +58,15 @@ var (
 )
 
 func main() {
-	// Banner.
-	log.Printf("Hyperfox v%s // https://hyperfox.org\n", version)
-	log.Printf("By José Carlos Nieto.\n\n")
+	log.Printf("Hyperfox v%s // https://hyperfox.org\n", Version)
+	log.Printf("By José Nieto.\n\n")
 
 	// Parsing command line flags.
 	flag.Parse()
 
 	// Opening database.
 	var err error
-	sess, err = dbInit()
+	sess, err = initDB()
 	if err != nil {
 		log.Fatal("Failed to setup database: ", err)
 	}
@@ -76,29 +74,29 @@ func main() {
 
 	storage = sess.Collection(defaultCaptureCollection)
 	if !storage.Exists() {
-		log.Fatal("Storage table does not exist")
+		log.Fatalf("No such table %q", defaultCaptureCollection)
 	}
 
-	// Is SSL enabled?
+	// Is TLS enabled?
 	var sslEnabled bool
-	if *flagSSLPort > 0 && *flagSSLCertFile != "" {
+	if *flagTLSPort > 0 && *flagTLSCertFile != "" {
 		sslEnabled = true
 	}
 
-	// User requested SSL mode.
+	// User requested TLS mode.
 	if sslEnabled {
-		if *flagSSLCertFile == "" {
+		if *flagTLSCertFile == "" {
 			flag.Usage()
 			log.Fatal("Missing root CA certificate")
 		}
 
-		if *flagSSLKeyFile == "" {
+		if *flagTLSKeyFile == "" {
 			flag.Usage()
 			log.Fatal("Missing root CA private key")
 		}
 
-		os.Setenv(proxy.EnvSSLCert, *flagSSLCertFile)
-		os.Setenv(proxy.EnvSSLKey, *flagSSLKeyFile)
+		os.Setenv(proxy.EnvTLSCert, *flagTLSCertFile)
+		os.Setenv(proxy.EnvTLSKey, *flagTLSKeyFile)
 	}
 
 	// Creating proxy.
@@ -108,29 +106,34 @@ func main() {
 	p.AddLogger(logger.Stdout{})
 
 	// Attaching capture tool.
-	res := make(chan capture.Response, 256)
+	res := make(chan *capture.Record, 256)
 
 	p.AddBodyWriteCloser(capture.New(res))
 
 	// Saving captured data with a goroutine.
-	go func() {
-		for {
-			select {
-			case r := <-res:
-				go func() {
-					if _, err := storage.Insert(r); err != nil {
-						log.Printf("Failed to save to database: %s", err)
-					}
-				}()
-			}
+	go func(res chan *capture.Record) {
+		for r := range res {
+			go func(r *capture.Record) {
+				err := storage.InsertReturning(r)
+				if err != nil {
+					log.Printf("Failed to save to database: %s", err)
+				}
+				message := struct {
+					LastRecordID uint64 `json:"last_record_id"`
+				}{r.RecordMeta.ID}
+				if err := wsBroadcast(message); err != nil {
+					log.Print("wsBroadcast: ", err)
+				}
+			}(r)
 		}
-	}()
+	}(res)
 
-	if err = startServices(); err != nil {
-		log.Fatal("startServices:", err)
+	if *flagUI || *flagAPI {
+		if err = startServices(); err != nil {
+			log.Fatal("ui.Serve: ", err)
+		}
+		fmt.Println("")
 	}
-
-	fmt.Println("")
 
 	var wg sync.WaitGroup
 
@@ -140,7 +143,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := p.Start(fmt.Sprintf("%s:%d", *flagAddress, *flagPort)); err != nil {
-				log.Fatalf("Failed to bind on the given interface (HTTP): ", err)
+				log.Fatalf("Failed to bind to %s:%d (HTTP): %v", *flagAddress, *flagPort, err)
 			}
 		}()
 	}
@@ -149,18 +152,8 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
-				log.Fatalf("Failed to bind on the given interface (HTTPS): ", err)
-			}
-		}()
-	}
-
-	if *flagUnixSocket != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := p.StartUnix(proxyUnixSocket, *flagUnixSocket); err != nil {
-				log.Fatalf("Failed to bind on %s: %s", proxyUnixSocket, err)
+			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagTLSPort)); err != nil {
+				log.Fatalf("Failed to bind to %s:%d (TLS): %v", *flagAddress, *flagTLSPort, err)
 			}
 		}()
 	}
