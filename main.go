@@ -37,18 +37,19 @@ import (
 const Version = "2.0.0"
 
 const (
-	defaultAddress = `0.0.0.0`
+	defaultAddress = `127.0.0.1`
 	defaultPort    = uint(1080)
-	defaultSSLPort = uint(10443)
+	defaultTLSPort = uint(10443)
 )
 
 var (
-	flagDatabase    = flag.String("database", "", "Path to SQLite database.")
-	flagAddress     = flag.String("proxy-addr", defaultAddress, "IP address of the proxy.")
-	flagPort        = flag.Uint("proxy-http-port", defaultPort, "Port to bind to (plaintext mode).")
-	flagSSLPort     = flag.Uint("proxy-tls-port", defaultSSLPort, "Port to bind to (TLS mode). Requires --root-ca-cert and --root-ca-key.")
-	flagSSLCertFile = flag.String("root-ca-cert", "", "Path to root CA certificate.")
-	flagSSLKeyFile  = flag.String("root-ca-key", "", "Path to root CA key.")
+	flagHelp        = flag.Bool("help", false, "Displays help.")
+	flagDatabase    = flag.String("db", "", "Path to SQLite database.")
+	flagAddress     = flag.String("addr", defaultAddress, "Bind address.")
+	flagPort        = flag.Uint("http", defaultPort, "Bind port (HTTP mode).")
+	flagTLSPort     = flag.Uint("https", defaultTLSPort, "Bind port (SSL/TLS mode). Requires --ca-cert and --ca-key.")
+	flagTLSCertFile = flag.String("ca-cert", "", "Path to root CA certificate.")
+	flagTLSKeyFile  = flag.String("ca-key", "", "Path to root CA key.")
 )
 
 var (
@@ -76,26 +77,26 @@ func main() {
 		log.Fatalf("No such table %q", defaultCaptureCollection)
 	}
 
-	// Is SSL enabled?
+	// Is TLS enabled?
 	var sslEnabled bool
-	if *flagSSLPort > 0 && *flagSSLCertFile != "" {
+	if *flagTLSPort > 0 && *flagTLSCertFile != "" {
 		sslEnabled = true
 	}
 
-	// User requested SSL mode.
+	// User requested TLS mode.
 	if sslEnabled {
-		if *flagSSLCertFile == "" {
+		if *flagTLSCertFile == "" {
 			flag.Usage()
 			log.Fatal("Missing root CA certificate")
 		}
 
-		if *flagSSLKeyFile == "" {
+		if *flagTLSKeyFile == "" {
 			flag.Usage()
 			log.Fatal("Missing root CA private key")
 		}
 
-		os.Setenv(proxy.EnvSSLCert, *flagSSLCertFile)
-		os.Setenv(proxy.EnvSSLKey, *flagSSLKeyFile)
+		os.Setenv(proxy.EnvTLSCert, *flagTLSCertFile)
+		os.Setenv(proxy.EnvTLSKey, *flagTLSKeyFile)
 	}
 
 	// Creating proxy.
@@ -127,7 +128,7 @@ func main() {
 		}
 	}(res)
 
-	if !*flagDisableService {
+	if *flagUI || *flagAPI {
 		if err = startServices(); err != nil {
 			log.Fatal("ui.Serve: ", err)
 		}
@@ -151,8 +152,8 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagSSLPort)); err != nil {
-				log.Fatal("Failed to bind to %s:%d (HTTPs): ", *flagAddress, *flagSSLPort, err)
+			if err := p.StartTLS(fmt.Sprintf("%s:%d", *flagAddress, *flagTLSPort)); err != nil {
+				log.Fatal("Failed to bind to %s:%d (HTTPs): ", *flagAddress, *flagTLSPort, err)
 			}
 		}()
 	}

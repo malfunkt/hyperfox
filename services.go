@@ -40,11 +40,11 @@ import (
 )
 
 var (
+	flagUI             = flag.Bool("ui", false, "Enable UI")
+	flagAPI            = flag.Bool("api", false, "Enable API (enabled automatically if --ui is provided)")
 	flagUIAddr         = flag.String("ui-addr", "127.0.0.1:1984", "UI server address.")
-	flagAPIAddr        = flag.String("api-addr", "0.0.0.0:4891", "API server address.")
-	flagHeadless       = flag.Bool("headless", false, "Disable UI.")
-	flagDisableService = flag.Bool("disable-service", false, "Disable API service.")
-	flagDisableAPIAuth = flag.Bool("disable-api-auth", false, "Disable API authentication code.")
+	flagAPIAddr        = flag.String("api-addr", "127.0.0.1:4891", "API server address.")
+	flagDisableAPIAuth = flag.Bool("disable-api-auth", false, "Disable API server authentication.")
 )
 
 type catchAllFS struct {
@@ -204,11 +204,20 @@ func displayQRCode(apiAddr string) error {
 // startServices starts an http server that provides websocket and rest
 // services.
 func startServices() error {
-	apiAddr, err := apiServer()
-	if err != nil {
-		log.Fatal("Error starting API server: ", err)
+	var apiAddr string
+
+	if *flagUI || *flagAPI {
+		var err error
+		apiAddr, err = apiServer()
+		if err != nil {
+			log.Fatal("Error starting API server: ", err)
+		}
+		log.Printf("Started API server at %v (auth token: %q)", apiAddr, apiAuthToken)
 	}
-	log.Printf("Started API server at %v (auth token: %q)", apiAddr, apiAuthToken)
+
+	if !*flagUI {
+		return nil
+	}
 
 	uiAddr, err := uiServer(apiAddr)
 	if err != nil {
@@ -232,5 +241,5 @@ func startServices() error {
 		}
 	}
 
-	return err
+	return nil
 }

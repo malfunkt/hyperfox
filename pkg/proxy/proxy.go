@@ -40,12 +40,12 @@ import (
 )
 
 const (
-	// EnvSSLKey defines the name for the environment variable that holds the
-	// root SSL key.
-	EnvSSLKey = `HYPERFOX_SSL_KEY`
-	// EnvSSLCert defines the name for the environment variable that holds the
-	// root SSL certificate..
-	EnvSSLCert = `HYPERFOX_SSL_CERT`
+	// EnvTLSKey defines the name for the environment variable that holds the
+	// root TLS key.
+	EnvTLSKey = `HYPERFOX_TLS_KEY`
+	// EnvTLSCert defines the name for the environment variable that holds the
+	// root TLS certificate..
+	EnvTLSCert = `HYPERFOX_TLS_CERT`
 )
 
 // BodyWriteCloser interface returns a io.WriteCloser where a copy of the
@@ -349,7 +349,7 @@ func (p *Proxy) StartTLS(addr string) error {
 		},
 	}
 
-	cert, key := os.Getenv(EnvSSLCert), os.Getenv(EnvSSLKey)
+	cert, key := os.Getenv(EnvTLSCert), os.Getenv(EnvTLSKey)
 
 	gencert.SetRootCACert(cert)
 	gencert.SetRootCAKey(key)

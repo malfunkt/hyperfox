@@ -79,10 +79,10 @@ func (i testInterceptor) Intercept(res *http.Response) error {
 	return nil
 }
 
-type testDirectorSSL struct {
+type testDirectorTLS struct {
 }
 
-func (d testDirectorSSL) Direct(req *http.Request) error {
+func (d testDirectorTLS) Direct(req *http.Request) error {
 	newRequest, _ := http.NewRequest("GET", "https://www.example.org/", nil)
 	*req = *newRequest
 	return nil
@@ -373,7 +373,7 @@ func TestActualHTTPClient(t *testing.T) {
 func TestHTTPsDirectorInterface(t *testing.T) {
 	sslProxy.Reset()
 	// Adding a director that will change the request destination to insecure.org
-	sslProxy.AddDirector(testDirectorSSL{})
-	log.Printf("SSL proxy server will be open for 5 secs from now...")
+	sslProxy.AddDirector(testDirectorTLS{})
+	log.Printf("TLS proxy server will be open for 5 secs from now...")
 	time.Sleep(time.Second * 5)
 }
