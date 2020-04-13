@@ -18,6 +18,7 @@ download() {
   LATEST_RELEASE_JSON="https://api.github.com/repos/malfunkt/hyperfox/releases/latest"
   DOWNLOAD_URL=$(curl --silent -L $LATEST_RELEASE_JSON | grep browser_download_url | sed s/'^.*: "'//g | sed s/'"$'//g | grep "$OS.*$ARCH")
 
+  echo "Downloading ${DOWNLOAD_URL}..."
   if [ -z "$DOWNLOAD_URL" ]; then
     curl --silent -L $LATEST_RELEASE_JSON;
     echo "Github API is not working right now. Please try again later.";
@@ -50,8 +51,7 @@ download() {
     echo "Could not install." && exit 1
   fi;
 
-  echo "This script needs root privileges in order to install into $BIN_DIR."
-  sudo install -c -m 0755 $FILENAME $BIN_DIR/hyperfox
+  sudo install -c -m 0755 $FILENAME $BIN_DIR/hyperfox || echo "This script needs root privileges in order to install into $BIN_DIR."
   rm $FILENAME
 }
 
