@@ -47,8 +47,8 @@ const (
 )
 
 var (
-	rootCACert = "../../ssl/rootCA.crt"
-	rootCAKey  = "../../ssl/rootCA.key"
+	rootCACert = "../../ca/rootCA.crt"
+	rootCAKey  = "../../ca/rootCA.key"
 )
 
 var (
@@ -85,7 +85,7 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 	// Attempt to verify certs.
 	if _, err = tls.LoadX509KeyPair(certFile, keyFile); err == nil {
 		// Keys already in place
-		return "", "", err
+		return certFile, keyFile, nil
 	}
 
 	log.Printf("Creating SSL certificate for %s...", commonName)
