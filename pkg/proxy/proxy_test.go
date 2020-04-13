@@ -121,7 +121,7 @@ func TestListenHTTP(t *testing.T) {
 	proxy = NewProxy()
 
 	go func() {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 		proxy.Stop()
 	}()
 
@@ -132,13 +132,15 @@ func TestListenHTTP(t *testing.T) {
 			}
 		}
 	}()
+
+	time.Sleep(time.Second)
 }
 
 func TestListenHTTPs(t *testing.T) {
 	sslProxy = NewProxy()
 
 	go func() {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 		sslProxy.Stop()
 	}()
 
@@ -149,6 +151,8 @@ func TestListenHTTPs(t *testing.T) {
 			}
 		}
 	}()
+
+	time.Sleep(time.Second)
 }
 
 func TestProxyResponse(t *testing.T) {

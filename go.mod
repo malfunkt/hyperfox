@@ -12,9 +12,7 @@ require (
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/rakyll/statik v0.1.7
 	github.com/stretchr/testify v1.5.1 // indirect
-	github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
-	golang.org/x/tools v0.0.0-20200410194907-79a7a3126eef // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	upper.io/db.v3 v3.6.1+incompatible
 )

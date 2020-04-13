@@ -226,6 +226,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Proxying client request to destination server.
 	var err error
+	if p.rt == nil {
+		log.Printf("Missing RoundTripper")
+		return
+	}
 	if pr.Response, err = p.rt.RoundTrip(out); err != nil {
 		log.Printf("RoundTrip: %q", err)
 		w.WriteHeader(http.StatusInternalServerError)
