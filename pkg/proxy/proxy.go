@@ -315,7 +315,7 @@ func (p *Proxy) Start(addr string) error {
 	}
 	p.ln = ln
 
-	log.Printf("Listening for HTTP requests at %s.\n", addr)
+	log.Printf("Listening for HTTP requests at %s\n", addr)
 	if err := p.srv.Serve(ln); err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func (p *Proxy) StartTLS(addr string) error {
 	}
 	p.ln = ln
 
-	log.Printf("Listening for HTTP requests at %s (SSL/TLS mode).\n", addr)
+	log.Printf("Listening for HTTP requests at %s (SSL/TLS mode)\n", addr)
 	if err := p.srv.ServeTLS(ln, cert, key); err != nil {
 		return err
 	}

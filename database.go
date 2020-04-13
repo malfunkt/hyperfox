@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"upper.io/db.v3"
@@ -54,6 +55,8 @@ func initDB() (db.Database, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("Using SQLite database: %s", databaseName)
 
 	// Collection lookup.
 	col := sess.Collection(defaultCaptureCollection)

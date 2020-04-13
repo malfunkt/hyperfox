@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -12,6 +11,7 @@ import (
 var (
 	wsClients = map[*websocket.Conn]struct{}{}
 	wsMu      = sync.Mutex{}
+	wsDebug   = false
 )
 
 var wsUpgrader = websocket.Upgrader{} // use default options
@@ -23,7 +23,7 @@ func init() {
 func liveHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Print("upgrade:", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -37,12 +37,16 @@ func wsAddConn(conn *websocket.Conn) {
 	wsClients[conn] = struct{}{}
 	go func() {
 		if err := wsReadMessages(conn); err != nil {
-			log.Print("wsReadMessages: ", err)
+			if wsDebug {
+				log.Print("ws read: ", err)
+			}
 		}
 	}()
 
 	if err := wsSendMessage(conn, nil); err != nil {
-		log.Print("wsSendMessage: ", err)
+		if wsDebug {
+			log.Print("ws send: ", err)
+		}
 	}
 }
 
@@ -51,11 +55,9 @@ func wsReadMessages(conn *websocket.Conn) error {
 		reply := map[string]string{}
 
 		if err := conn.ReadJSON(&reply); err != nil {
-			fmt.Print("Can't receive: ", err)
 			defer wsRemoveConn(conn)
 			return err
 		}
-		log.Printf("reply: %v", reply)
 	}
 }
 
@@ -64,7 +66,6 @@ func wsBroadcast(message interface{}) error {
 
 	for conn := range wsClients {
 		if err := wsSendMessage(conn, message); err != nil {
-			log.Print("wsSendMessage: ", err)
 			defer wsRemoveConn(conn)
 		}
 	}
