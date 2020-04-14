@@ -14,7 +14,7 @@ following command (requires admin privileges):
 curl -sL 'https://raw.githubusercontent.com/malfunkt/hyperfox/master/install.sh' | sh
 ```
 
-You can also grab a release from our [releases
+If you'd rather not accept free candy you may grab a release from our [releases
 page](https://github.com/malfunkt/hyperfox/releases) and install it manually.
 
 ## How does it work?
@@ -33,6 +33,8 @@ database name (e.g.: `--db traffic-log.db`).
 
 ### User interface (`--ui`)
 
+![hyperfox-ui](https://user-images.githubusercontent.com/385670/79090465-6e7eb300-7d0f-11ea-8fc6-df1e6da8a12e.png)
+
 Use the `--ui` parameter to enable Hyperfox UI. If you're running on a system
 with a GUI and a web browser, Hyperfox will attempt to open a browser window to
 display its UI:
@@ -41,7 +43,7 @@ display its UI:
 hyperfox --db records.db --ui
 ```
 
-The above command creates a web server that binds to 127.0.0.1:1984. If you'd
+The above command creates a web server that binds to `127.0.0.1:1984`. If you'd
 like to change the bind address or port use the `--ui-addr` switch:
 
 ```
@@ -55,8 +57,8 @@ Enabling the UI also enables a minimal REST API (at `127.0.0.1:4891`) that is
 consumed by the front-end application.
 
 Please note that Hyperfox's REST API is only protected by a randomly generated
-key that changes everytime Hyperfox starts, this might not be adecuate
-depending on your use case.
+key that changes everytime Hyperfox starts, depending on your use case this
+might not be adecuate for you.
 
 #### Run Hyperfox UI on your mobile device
 

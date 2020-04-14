@@ -39,11 +39,16 @@ import (
 	"github.com/rakyll/statik/fs"
 )
 
+const (
+	defaultUIPort  = 1984
+	defaultAPIPort = 4891
+)
+
 var (
 	flagUI             = flag.Bool("ui", false, "Enable UI")
 	flagAPI            = flag.Bool("api", false, "Enable API (enabled automatically if --ui is provided)")
-	flagUIAddr         = flag.String("ui-addr", "127.0.0.1:1984", "UI server address.")
-	flagAPIAddr        = flag.String("api-addr", "127.0.0.1:4891", "API server address.")
+	flagUIAddr         = flag.String("ui-addr", fmt.Sprintf("%s:%d", defaultAddress, defaultUIPort), "UI server address.")
+	flagAPIAddr        = flag.String("api-addr", fmt.Sprintf("%s:%d", defaultAddress, defaultAPIPort), "API server address.")
 	flagDisableAPIAuth = flag.Bool("disable-api-auth", false, "Disable API server authentication.")
 )
 
@@ -130,8 +135,22 @@ func apiServer() (string, error) {
 
 	r.HandleFunc("/live", liveHandler)
 
+	host, port, err := net.SplitHostPort(*flagAPIAddr)
+	if err != nil {
+		return "", err
+	}
+
+	if host == "" {
+		host = defaultAddress
+	}
+	if port == "" {
+		port = fmt.Sprintf("%s", defaultAPIPort)
+	}
+
+	apiAddr := fmt.Sprintf("%s:%s", host, port)
+
 	srv := &http.Server{
-		Addr:    *flagAPIAddr,
+		Addr:    apiAddr,
 		Handler: r,
 	}
 
@@ -143,7 +162,7 @@ func apiServer() (string, error) {
 		}
 	}()
 
-	return *flagAPIAddr, nil
+	return apiAddr, nil
 }
 
 func uiServer(apiAddr string) (string, error) {
@@ -153,8 +172,22 @@ func uiServer(apiAddr string) (string, error) {
 		return "", err
 	}
 
+	host, port, err := net.SplitHostPort(*flagUIAddr)
+	if err != nil {
+		return "", err
+	}
+
+	if host == "" {
+		host = defaultAddress
+	}
+	if port == "" {
+		port = fmt.Sprintf("%s", defaultAPIPort)
+	}
+
+	uiAddr := fmt.Sprintf("%s:%s", host, port)
+
 	srv := &http.Server{
-		Addr:    *flagUIAddr,
+		Addr:    uiAddr,
 		Handler: http.FileServer(&catchAllFS{statikFS}),
 	}
 
@@ -166,7 +199,7 @@ func uiServer(apiAddr string) (string, error) {
 		}
 	}()
 
-	return *flagUIAddr, nil
+	return uiAddr, nil
 }
 
 func localAddr() (string, error) {
@@ -179,14 +212,14 @@ func localAddr() (string, error) {
 	return conn.LocalAddr().(*net.UDPAddr).IP.String(), nil
 }
 
-func displayQRCode(apiAddr string) error {
+func displayQRCode(uiAddr, apiAddr string) error {
 	addr, err := localAddr()
 	if err != nil {
 		return err
 	}
 
-	_, uiPort, _ := net.SplitHostPort(*flagUIAddr)
-	_, apiPort, _ := net.SplitHostPort(*flagAPIAddr)
+	_, uiPort, _ := net.SplitHostPort(uiAddr)
+	_, apiPort, _ := net.SplitHostPort(apiAddr)
 
 	addrWithToken := fmt.Sprintf("http://%s:%s/?source=%s:%s&auth=%s",
 		addr,
@@ -234,9 +267,9 @@ func startServices() error {
 
 	log.Printf("Watch live capture at %s", uiAddrWithToken)
 
-	host, _, _ := net.SplitHostPort(*flagUIAddr)
+	host, _, _ := net.SplitHostPort(uiAddr)
 	if host != "127.0.0.1" {
-		if err := displayQRCode(apiAddr); err != nil {
+		if err := displayQRCode(uiAddr, apiAddr); err != nil {
 			log.Printf("Failed to display QR code: %v", err)
 		}
 	}
