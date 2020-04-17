@@ -50,6 +50,7 @@ var (
 	flagTLSPort     = flag.Uint("https", defaultTLSPort, "Bind port (SSL/TLS mode). Requires --ca-cert and --ca-key.")
 	flagTLSCertFile = flag.String("ca-cert", "", "Path to root CA certificate.")
 	flagTLSKeyFile  = flag.String("ca-key", "", "Path to root CA key.")
+	flagDNS         = flag.String("dns", "", "Custom DNS server")
 )
 
 var (
@@ -101,6 +102,12 @@ func main() {
 
 	// Creating proxy.
 	p := proxy.NewProxy()
+
+	if flagDNS != nil {
+		if err := p.SetCustomDNS(*flagDNS); err != nil {
+			log.Fatalf("unable to set custom DNS server: %v", err)
+		}
+	}
 
 	// Attaching logger.
 	p.AddLogger(logger.Stdout{})

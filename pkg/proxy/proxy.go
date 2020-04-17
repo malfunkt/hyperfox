@@ -24,7 +24,9 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -32,6 +34,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/miekg/dns"
 
 	"github.com/malfunkt/hyperfox/pkg/gencert"
 	"github.com/malfunkt/hyperfox/pkg/plugins/capture"
@@ -99,6 +103,8 @@ type Proxy struct {
 	interceptors []Interceptor
 	// Logger functions.
 	loggers []Logger
+	// Custom DNS server
+	dnsServer string
 }
 
 // ProxiedRequest struct provides properties for executing a *http.Request and
@@ -201,8 +207,6 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	out.ProtoMinor = 1
 	out.Close = false
 
-	startTime := time.Now()
-
 	// Walking over directors.
 	for i := range p.directors {
 		if err := p.directors[i].Direct(out); err != nil {
@@ -224,6 +228,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		out.Body = ioutil.NopCloser(body)
 	}
 
+	startTime := time.Now()
 	// Proxying client request to destination server.
 	var err error
 	if p.rt == nil {
@@ -301,13 +306,53 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (p *Proxy) SetCustomDNS(server string) error {
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		server = fmt.Sprintf("%s:%d", server, 53)
+	} else {
+		server = fmt.Sprintf("%s:%s", host, port)
+	}
+	p.dnsServer = server
+	return nil
+}
+func (p *Proxy) dialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	if p.dnsServer != "" {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		msg := &dns.Msg{}
+		msg.SetQuestion(dns.Fqdn(host), dns.TypeA)
+
+		client := dns.Client{}
+		resp, _, err := client.Exchange(msg, p.dnsServer)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ra := range resp.Answer {
+			if a, ok := ra.(*dns.A); ok {
+				addr = fmt.Sprintf("%s:%s", a.A.String(), port)
+				break
+			}
+		}
+	}
+
+	d := &net.Dialer{}
+	return d.DialContext(ctx, "tcp", addr)
+}
+
 // Start creates an HTTP proxy server that listens on the given address.
 func (p *Proxy) Start(addr string) error {
 	p.srv = http.Server{
 		Addr:    addr,
 		Handler: p,
 	}
-	p.rt = &http.Transport{}
+	p.rt = &http.Transport{
+		DialContext: p.dialContext,
+	}
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {

@@ -9,6 +9,7 @@ require (
 	github.com/gorilla/websocket v1.4.1
 	github.com/mattn/go-sqlite3 v1.11.0 // indirect
 	github.com/mdp/qrterminal/v3 v3.0.0
+	github.com/miekg/dns v1.1.29
 	github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4
 	github.com/rakyll/statik v0.1.7
 	github.com/stretchr/testify v1.5.1 // indirect

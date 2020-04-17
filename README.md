@@ -31,6 +31,12 @@ Everytime Hyperfox starts, a new database is created (e.g.:
 `hyperfox-00123.db`). You can change this behaviour by explicitly providing a
 database name (e.g.: `--db traffic-log.db`).
 
+Example:
+
+```
+curl -H 'Host: example.com' http://127.0.0.1:1080
+```
+
 ### User interface (`--ui`)
 
 ![hyperfox-ui](https://user-images.githubusercontent.com/385670/79090465-6e7eb300-7d0f-11ea-8fc6-df1e6da8a12e.png)
@@ -98,6 +104,12 @@ in, Hyperfox uses the
 [SNI](https://en.wikipedia.org/wiki/Server_Name_Indication) extension to
 identify the destination nameserver and to create a SSL/TLS certificate for it,
 this certificate is signed with the root CA key.
+
+Example:
+
+```
+curl -H 'Host: example.com' https://127.0.0.1:10443 -k
+```
 
 ## Usage
 
