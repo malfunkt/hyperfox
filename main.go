@@ -59,11 +59,17 @@ var (
 )
 
 func main() {
-	log.Printf("Hyperfox v%s // https://hyperfox.org\n", Version)
-	log.Printf("By José Nieto.\n\n")
+	fmt.Printf("Hyperfox v%s // https://hyperfox.org\n", Version)
+	fmt.Printf("By José Nieto.\n\n")
 
 	// Parsing command line flags.
 	flag.Parse()
+
+	if *flagHelp {
+		fmt.Printf("Usage: hyperfox [options]\n\n")
+		flag.PrintDefaults()
+		return
+	}
 
 	// Opening database.
 	var err error

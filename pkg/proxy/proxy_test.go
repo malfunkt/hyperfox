@@ -128,7 +128,7 @@ func TestListenHTTP(t *testing.T) {
 	go func() {
 		if err := proxy.Start(listenHTTPAddr); err != nil {
 			if !strings.Contains(err.Error(), "use of closed network connection") {
-				t.Fatal(err)
+				log.Fatalf("could not start HTTP server: %v", err)
 			}
 		}
 	}()
@@ -147,7 +147,7 @@ func TestListenHTTPs(t *testing.T) {
 	go func() {
 		if err := sslProxy.StartTLS(listenHTTPsAddr); err != nil {
 			if !strings.Contains(err.Error(), "use of closed network connection") {
-				t.Fatal(err)
+				log.Fatalf("could not start TLS server: %v", err)
 			}
 		}
 	}()

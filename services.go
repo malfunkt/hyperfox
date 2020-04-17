@@ -111,7 +111,9 @@ func apiServer() (string, error) {
 	})
 	r.Use(cors.Handler)
 
-	r.Use(authMiddleware)
+	if !*flagDisableAPIAuth {
+		r.Use(authMiddleware)
+	}
 
 	r.Route("/records", func(r chi.Router) {
 		r.Get("/", capturesHandler)
@@ -144,7 +146,7 @@ func apiServer() (string, error) {
 		host = defaultAddress
 	}
 	if port == "" {
-		port = fmt.Sprintf("%s", defaultAPIPort)
+		port = fmt.Sprintf("%d", defaultAPIPort)
 	}
 
 	apiAddr := fmt.Sprintf("%s:%s", host, port)
@@ -181,7 +183,7 @@ func uiServer(apiAddr string) (string, error) {
 		host = defaultAddress
 	}
 	if port == "" {
-		port = fmt.Sprintf("%s", defaultAPIPort)
+		port = fmt.Sprintf("%d", defaultAPIPort)
 	}
 
 	uiAddr := fmt.Sprintf("%s:%s", host, port)
