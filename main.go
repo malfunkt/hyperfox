@@ -127,13 +127,13 @@ func main() {
 	go func(res chan *capture.Record) {
 		for r := range res {
 			go func(r *capture.Record) {
-				err := storage.InsertReturning(r)
+				id, err := storage.Insert(r)
 				if err != nil {
 					log.Printf("Failed to save to database: %s", err)
 				}
 				message := struct {
-					LastRecordID uint64 `json:"last_record_id"`
-				}{r.RecordMeta.ID}
+					LastRecordID int64 `json:"last_record_id"`
+				}{id.(int64)}
 				if err := wsBroadcast(message); err != nil {
 					log.Print("wsBroadcast: ", err)
 				}
