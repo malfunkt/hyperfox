@@ -390,33 +390,32 @@ func certificateLookup(clientHello *tls.ClientHelloInfo) (*tls.Certificate, erro
 
 // StartTLS creates an HTTPs proxy server that listens on the given address.
 func (p *Proxy) StartTLS(addr string) error {
-	p.srv = http.Server{
-		Addr:    addr,
-		Handler: p,
-		TLSConfig: &tls.Config{
-			GetCertificate:     certificateLookup,
-			InsecureSkipVerify: false,
-		},
-	}
-	p.rt = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: false,
-		},
-	}
-
 	cert, key := os.Getenv(EnvTLSCert), os.Getenv(EnvTLSKey)
-
 	gencert.SetRootCACert(cert)
 	gencert.SetRootCAKey(key)
+
+	srv := http.Server{
+		Addr:    addr,
+		Handler: p,
+	}
+
+	tlsConfig := &tls.Config{
+		GetCertificate: certificateLookup,
+	}
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
+
+	tlsListener := tls.NewListener(ln, tlsConfig)
+
+	p.srv = srv
 	p.ln = ln
+	p.rt = &http.Transport{}
 
 	log.Printf("Listening for HTTP requests at %s (SSL/TLS mode)\n", addr)
-	if err := p.srv.ServeTLS(ln, cert, key); err != nil {
+	if err := p.srv.Serve(tlsListener); err != nil {
 		return err
 	}
 
