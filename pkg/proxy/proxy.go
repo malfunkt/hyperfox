@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -306,16 +307,6 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *Proxy) SetCustomDNS(server string) error {
-	host, port, err := net.SplitHostPort(server)
-	if err != nil {
-		server = fmt.Sprintf("%s:%d", server, 53)
-	} else {
-		server = fmt.Sprintf("%s:%s", host, port)
-	}
-	p.dnsServer = server
-	return nil
-}
 func (p *Proxy) dialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	if p.dnsServer != "" {
 		host, port, err := net.SplitHostPort(addr)
@@ -342,6 +333,21 @@ func (p *Proxy) dialContext(ctx context.Context, network, addr string) (net.Conn
 
 	d := &net.Dialer{}
 	return d.DialContext(ctx, "tcp", addr)
+}
+
+// SetCustomDNS sets a DNS server that bypasses the OS settings
+func (p *Proxy) SetCustomDNS(server string) error {
+	if server == "" {
+		return errors.New("server is empty")
+	}
+	host, port, err := net.SplitHostPort(server)
+	if err != nil {
+		server = fmt.Sprintf("%s:%d", server, 53)
+	} else {
+		server = fmt.Sprintf("%s:%s", host, port)
+	}
+	p.dnsServer = server
+	return nil
 }
 
 // Start creates an HTTP proxy server that listens on the given address.
@@ -384,33 +390,32 @@ func certificateLookup(clientHello *tls.ClientHelloInfo) (*tls.Certificate, erro
 
 // StartTLS creates an HTTPs proxy server that listens on the given address.
 func (p *Proxy) StartTLS(addr string) error {
-	p.srv = http.Server{
-		Addr:    addr,
-		Handler: p,
-		TLSConfig: &tls.Config{
-			GetCertificate:     certificateLookup,
-			InsecureSkipVerify: false,
-		},
-	}
-	p.rt = &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: false,
-		},
-	}
-
 	cert, key := os.Getenv(EnvTLSCert), os.Getenv(EnvTLSKey)
-
 	gencert.SetRootCACert(cert)
 	gencert.SetRootCAKey(key)
+
+	srv := http.Server{
+		Addr:    addr,
+		Handler: p,
+	}
+
+	tlsConfig := &tls.Config{
+		GetCertificate: certificateLookup,
+	}
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
+
+	tlsListener := tls.NewListener(ln, tlsConfig)
+
+	p.srv = srv
 	p.ln = ln
+	p.rt = &http.Transport{}
 
 	log.Printf("Listening for HTTP requests at %s (SSL/TLS mode)\n", addr)
-	if err := p.srv.ServeTLS(ln, cert, key); err != nil {
+	if err := p.srv.Serve(tlsListener); err != nil {
 		return err
 	}
 

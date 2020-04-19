@@ -2,8 +2,8 @@
 
 [![Build Status](https://travis-ci.org/malfunkt/hyperfox.svg?branch=master)](https://travis-ci.org/malfunkt/hyperfox)
 
-[Hyperfox][1] is a security auditing tool that proxies and records HTTP traffic
-between two points.
+[Hyperfox][1] is a security auditing tool that proxies and records HTTP and
+HTTPS traffic between two points.
 
 ## Installation
 
@@ -14,8 +14,9 @@ following command (requires admin privileges):
 curl -sL 'https://raw.githubusercontent.com/malfunkt/hyperfox/master/install.sh' | sh
 ```
 
-If you'd rather not accept free candy you may grab a release from our [releases
-page](https://github.com/malfunkt/hyperfox/releases) and install it manually.
+If you'd rather not accept free candy from this van you can also grab a release
+from our [releases page](https://github.com/malfunkt/hyperfox/releases) and
+install it manually.
 
 ## How does it work?
 
@@ -31,19 +32,34 @@ Everytime Hyperfox starts, a new database is created (e.g.:
 `hyperfox-00123.db`). You can change this behaviour by explicitly providing a
 database name (e.g.: `--db traffic-log.db`).
 
-Example:
+### Usage
+
+Launch Hyperfox with default configuration:
 
 ```
-curl -H 'Host: example.com' http://127.0.0.1:1080
+hyperfox
+```
+
+use `cURL` to request any HTTP page, the `-x` parameter tells cURL to use
+hyperfox as proxy:
+
+```
+curl -x http://127.0.0.1:1080 example.com
+```
+
+you should be able to see a log for the page you requested in Hyperfox's output:
+
+```
+...
+127.0.0.1:44254 - - [11/Apr/2020:19:19:48 -0500] "GET http://example.com/ HTTP/1.1" 200 -1
 ```
 
 ### User interface (`--ui`)
 
 ![hyperfox-ui](https://user-images.githubusercontent.com/385670/79090465-6e7eb300-7d0f-11ea-8fc6-df1e6da8a12e.png)
 
-Use the `--ui` parameter to enable Hyperfox UI. If you're running on a system
-with a GUI and a web browser, Hyperfox will attempt to open a browser window to
-display its UI:
+Use the `--ui` parameter to enable Hyperfox UI wich will open in a new browser
+window:
 
 ```
 hyperfox --db records.db --ui
@@ -64,7 +80,7 @@ consumed by the front-end application.
 
 Please note that Hyperfox's REST API is only protected by a randomly generated
 key that changes everytime Hyperfox starts, depending on your use case this
-might not be adecuate for you.
+might not be adecuate.
 
 #### Run Hyperfox UI on your mobile device
 
@@ -82,14 +98,21 @@ Hyperfox won't be able to see anything happening between a client and a secure
 destination. This is only valid as long as the chain of trust remains
 untouched.
 
-Let's suppose the client trusts a root CA controlled by Hyperfox, in this case
-Hyperfox will be able to be part of the chain of trust by issuing certificates
-signed by the bogus CA.
+Let's suppose that the client trusts a root CA certificate that is known by
+Hyperfox, if that happens Hyperfox will be able to issue certificates that are
+going to be trusted by the client.
 
-Examples of such bogus root CA can be found here:
+Examples of such bogus root CA files be found here:
 
 * [Hyperfox CA cert](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ca/rootCA.crt)
 * [Hyperfox CA key](https://raw.githubusercontent.com/malfunkt/hyperfox/master/ca/rootCA.key)
+
+you can also [generate your own root CA certificate and
+key](https://www.ibm.com/support/knowledgecenter/SSZQDR/com.ibm.rba.doc/LD_rootkeyandcert.html).
+
+There are a [number of ways to install root CA
+certificates](https://www.bounca.org/tutorials/install_root_certificate.html),
+depending on your operating system.
 
 Use the `--ca-cert` and `--ca-key` flags to provide Hyperfox with the root CA
 certificate and key you'd like to use:
@@ -99,35 +122,77 @@ hyperfox --ca-cert rootCA.crt --ca-key rootCA.key
 ```
 
 the above command creates a special server and binds it to `127.0.0.1:10443`,
-this server waits for a SSL/TLS connection to arrive. When a new SSL/TLS hits
-in, Hyperfox uses the
+this server waits for a SSL/TLS connection to arrive. When a new SSL/TLS
+connection hits in, Hyperfox uses the
 [SNI](https://en.wikipedia.org/wiki/Server_Name_Indication) extension to
 identify the destination nameserver and to create a SSL/TLS certificate for it,
-this certificate is signed with the root CA key.
+this certificate is signed with the providede root CA key.
 
-Example:
+#### TLS interception example
 
-```
-curl -H 'Host: example.com' https://127.0.0.1:10443 -k
-```
-
-## Usage
-
-### Via `/etc/hosts`
+Launch Hyperfox with appropriate TLS parameters and `--http 443` (port 443
+requires admin privileges).
 
 ```
-example.org 127.0.0.1
+sudo hyperfox --ca-cert ./ca/rootCA.crt --ca-key ./ca/rootCA.key --https 443
 ```
 
+Use cURL to build a HTTPs request to example.com: the `--resolve` option tells
+cURL to skip DNS verification and use `127.0.0.1` as if it were the legitimate
+address for `example.com`, while the `-k` parameter tells cURL to accept any
+TLS certificate.
+
 ```
-hyperfox --http 80
+curl -k --resolve example.com:443:127.0.0.1 https://example.com
 ```
 
-### Via `arpfox` (ARPSpoofing)
+you should be able to see a log for the page you requested in Hyperfox's output:
+
+```
+127.0.0.1:36398 - - [11/Apr/2020:19:36:56 -0500] "GET https://example.com/ HTTP/2.0" 200 -1
+```
+
+## Usage examples
+
+### Via `/etc/hosts` on localhost
+
+Add the host you'd like to inspect to your `/etc/hosts` file:
+
+```
+example.com 127.0.0.1
+```
+
+Run Hyperfox with the options you'd like, just remember that you should use
+ports 80 for HTTP and 443 for HTTPS, and that requires admin privileges. In
+addition to `--http` and `--https` use the `--dns` parameter with a valid DNS
+resolver:
+
+```
+sudo hyperfox --ui --http 80 --dns 8.8.8.8
+```
+
+that will make Hyperfox skip the OS DNS resolver and use an alternative one
+(remember that example.com points to 127.0.1).
+
+Now use cURL and try to go to the destination:
+
+```
+curl http://example.com
+```
+
+Hyperfox will capture the request and print it to its output:
+
+```
+127.0.0.1:41766 - - [11/Apr/2020:19:43:30 -0500] "GET http://example.com/ HTTP/1.1" 200 -1
+```
+
+### Via ARP Spoofing on a LAN
+
+See [MITM attack with arpfox and Hyperfox](https://xiam.dev/mitm-attack-with-arpfox-and-hyperfox/).
 
 ## Hacking
 
-Choose an [issue][3], fix it and send a pull request.
+Choose an [issue][2], fix it and send a pull request.
 
 ## License
 
@@ -153,5 +218,4 @@ Choose an [issue][3], fix it and send a pull request.
 > WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 [1]: https://hyperfox.org
-[2]: https://en.wikipedia.org/wiki/Man-in-the-middle_attack
-[3]: https://github.com/malfunkt/hyperfox/issues
+[2]: https://github.com/malfunkt/hyperfox/issues

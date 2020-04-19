@@ -50,7 +50,7 @@ var (
 	flagTLSPort     = flag.Uint("https", defaultTLSPort, "Bind port (SSL/TLS mode). Requires --ca-cert and --ca-key.")
 	flagTLSCertFile = flag.String("ca-cert", "", "Path to root CA certificate.")
 	flagTLSKeyFile  = flag.String("ca-key", "", "Path to root CA key.")
-	flagDNS         = flag.String("dns", "", "Custom DNS server")
+	flagDNS         = flag.String("dns", "", "Custom DNS server that bypasses the OS settings")
 )
 
 var (
@@ -109,7 +109,7 @@ func main() {
 	// Creating proxy.
 	p := proxy.NewProxy()
 
-	if flagDNS != nil {
+	if *flagDNS != "" {
 		if err := p.SetCustomDNS(*flagDNS); err != nil {
 			log.Fatalf("unable to set custom DNS server: %v", err)
 		}
@@ -127,13 +127,13 @@ func main() {
 	go func(res chan *capture.Record) {
 		for r := range res {
 			go func(r *capture.Record) {
-				err := storage.InsertReturning(r)
+				id, err := storage.Insert(r)
 				if err != nil {
 					log.Printf("Failed to save to database: %s", err)
 				}
 				message := struct {
-					LastRecordID uint64 `json:"last_record_id"`
-				}{r.RecordMeta.ID}
+					LastRecordID int64 `json:"last_record_id"`
+				}{id.(int64)}
 				if err := wsBroadcast(message); err != nil {
 					log.Print("wsBroadcast: ", err)
 				}

@@ -25,11 +25,11 @@ package gencert
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"log"
 	"math/big"
 	"net"
 	"os"
@@ -65,6 +65,12 @@ func SetRootCAKey(s string) {
 	rootCAKey = s
 }
 
+func bigIntHash(n *big.Int) []byte {
+	h := sha1.New()
+	h.Write(n.Bytes())
+	return h.Sum(nil)
+}
+
 // CreateKeyPair creates a key pair for the given hostname on the fly.
 func CreateKeyPair(commonName string) (certFile string, keyFile string, err error) {
 	mu.Lock()
@@ -74,7 +80,6 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 	if err != nil {
 		return "", "", err
 	}
-
 	commonName = strings.ToLower(commonName)
 
 	destDir := certDirectory + pathSeparator + commonName + pathSeparator
@@ -88,10 +93,9 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 		return certFile, keyFile, nil
 	}
 
-	log.Printf("Creating SSL certificate for %s...", commonName)
-
-	notBefore := time.Now().Add(-24 * 30 * time.Hour)
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
+	lastWeek := time.Now().AddDate(0, 0, -7)
+	notBefore := lastWeek
+	notAfter := lastWeek.AddDate(2, 0, 0)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -102,13 +106,16 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Hyperfox Fake Certificates, Inc"},
-			CommonName:   commonName,
+			Organization:       []string{"Hyperfox Fake Certificates"},
+			OrganizationalUnit: []string{"Hyperfox Fake Certificates"},
+			CommonName:         commonName,
 		},
-		NotBefore:   notBefore,
-		NotAfter:    notAfter,
-		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  false,
 	}
 
 	if ip := net.ParseIP(commonName); ip != nil {
@@ -126,10 +133,13 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 		return "", "", err
 	}
 
+	template.AuthorityKeyId = rootCA.Leaf.SubjectKeyId
+
 	var priv *rsa.PrivateKey
 	if priv, err = rsa.GenerateKey(rand.Reader, rsaBits); err != nil {
 		return "", "", err
 	}
+	template.SubjectKeyId = bigIntHash(priv.N)
 
 	var derBytes []byte
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &template, rootCA.Leaf, &priv.PublicKey, rootCA.PrivateKey); err != nil {
@@ -144,21 +154,21 @@ func CreateKeyPair(commonName string) (certFile string, keyFile string, err erro
 	if err != nil {
 		return "", "", err
 	}
+	defer certOut.Close()
 
 	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
 		return "", "", err
 	}
-	certOut.Close()
 
 	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return "", "", err
 	}
+	defer keyOut.Close()
 
 	if err := pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
 		return "", "", err
 	}
-	keyOut.Close()
 
 	return certFile, keyFile, nil
 }
