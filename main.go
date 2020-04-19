@@ -43,7 +43,8 @@ const (
 )
 
 var (
-	flagHelp        = flag.Bool("help", false, "Displays help.")
+	flagHelp        = flag.Bool("h", false, "Shows usage options.")
+	flagVersion     = flag.Bool("v", false, "Shows Hyperfox version.")
 	flagDatabase    = flag.String("db", "", "Path to SQLite database.")
 	flagAddress     = flag.String("addr", defaultAddress, "Bind address.")
 	flagPort        = flag.Uint("http", defaultPort, "Bind port (HTTP mode).")
@@ -59,10 +60,7 @@ var (
 )
 
 func main() {
-	fmt.Printf("Hyperfox v%s // https://hyperfox.org\n", Version)
-	fmt.Printf("By José Nieto.\n\n")
 
-	// Parsing command line flags.
 	flag.Parse()
 
 	if *flagHelp {
@@ -70,6 +68,13 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
+
+	if *flagVersion {
+		fmt.Printf("%s\n", Version)
+		return
+	}
+
+	fmt.Printf("Hyperfox v%s, by José Nieto\n\n", Version)
 
 	// Opening database.
 	var err error

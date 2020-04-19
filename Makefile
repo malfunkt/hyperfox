@@ -1,59 +1,83 @@
-SHELL               ?= /bin/bash
+SHELL               ?= $(shell which bash)
 BUILD_PATH          ?= github.com/malfunkt/hyperfox
 BUILD_OUTPUT_DIR    ?= bin
-DOCKER_CONTAINER    ?= hyperfox-builder
-BUILD_FLAGS					?= -v
+DOCKER_IMAGE        ?= hyperfox-builder
+BUILD_FLAGS					?= -v -mod vendor
 BIN_PREFIX          ?= hyperfox
 
 GH_OWNER            ?= malfunkt
 GH_REPO             ?= hyperfox
 GH_ACCESS_TOKEN     ?=
 
-all: docker-build
+define docker-run
+	docker run --rm \
+		-v $$PWD/$(BUILD_OUTPUT_DIR):/go/src/$(BUILD_PATH)/$(BUILD_OUTPUT_DIR) \
+		$(1) \
+		$(DOCKER_IMAGE) \
+		go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_$(2) $(BUILD_PATH)
+endef
+
+all: build-all
 
 build:
 	go build -o hyperfox github.com/malfunkt/hyperfox
 
-docker-build: docker-builder clean
-	mkdir -p $(BUILD_OUTPUT_DIR) && \
-	docker run \
-		-v $$PWD:/app/src/$(BUILD_PATH) \
-		-e CC=x86_64-w64-mingw32-gcc \
-		-e LD=x86_64-w64-mingw32-ld \
-		-e CGO_ENABLED=1 -e GOOS=windows -e GOARCH=amd64 \
-		$(DOCKER_CONTAINER) go build -ldflags -H=windowsgui $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.exe $(BUILD_PATH) && \
-	docker run \
-		-v $$PWD:/app/src/$(BUILD_PATH) \
-		-e CC=i686-w64-mingw32-gcc \
-		-e CGO_ENABLED=1 -e GOOS=windows -e GOARCH=386 \
-		$(DOCKER_CONTAINER) go build -ldflags -H=windowsgui $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.exe $(BUILD_PATH) && \
-	docker run \
-		-v $$PWD:/app/src/$(BUILD_PATH) \
-		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=amd64 \
-		$(DOCKER_CONTAINER) go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_linux_amd64 $(BUILD_PATH) && \
-	docker run \
-		-v $$PWD:/app/src/$(BUILD_PATH) \
-		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=386 \
-		$(DOCKER_CONTAINER) go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_linux_386 $(BUILD_PATH) && \
-	docker run \
-		-v $$PWD:/app/src/$(BUILD_PATH) \
-		-e CC=arm-linux-gnueabi-gcc \
-		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=arm -e GOARM=7 \
-		$(DOCKER_CONTAINER) go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_linux_armv7 $(BUILD_PATH) && \
+docker-builder:
+	docker build -t $(DOCKER_IMAGE) .
+
+docker-build-linux-armv7:
+	$(call docker-run, \
+		-e CGO_CFLAGS="-I/usr/arm-linux-gnueabi/include" \
+		-e CGO_LDFLAGS="-L/usr/arm-linux-gnueabi/lib" \
+  	-e CC="/usr/bin/arm-linux-gnueabi-gcc" \
+		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=arm -e GOARM=7,linux_armv7)
+
+docker-build-windows-amd64:
+	$(call docker-run, \
+		-e CC="/usr/bin/x86_64-w64-mingw32-gcc" \
+		-e LD="/usr/bin/x86_64-w64-mingw32-ld" \
+		-e CGO_ENABLED=1 -e GOOS=windows -e GOARCH=amd64,windows_amd64.exe)
+
+docker-build-windows-386:
+	$(call docker-run, \
+		-e CC="/usr/bin/i686-w64-mingw32-gcc" \
+		-e LD="/usr/bin/i686-w64-mingw32-ld" \
+		-e CGO_ENABLED=1 -e GOOS=windows -e GOARCH=386,windows_386.exe)
+
+docker-build-linux-amd64:
+	$(call docker-run, \
+		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=amd64,linux_amd64)
+
+docker-build-linux-386:
+	$(call docker-run, \
+		-e CGO_ENABLED=1 -e GOOS=linux -e GOARCH=386,linux_386)
+
+build-osx:
 	if [[ $$OSTYPE == "darwin"* ]]; then \
-		GOPARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_darwin_amd64 $(BUILD_PATH) && \
+		GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_darwin_amd64 $(BUILD_PATH) && \
 		gzip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_darwin_*; \
-	elif [[ $$OSTYPE == "freebsd"* ]]; then \
+	fi
+
+build-freebsd:
+	if [[ $$OSTYPE == "freebsd"* ]]; then \
 		GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_freebsd_amd64 $(BUILD_PATH) && \
 		gzip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_freebsd_*; \
-	fi && \
-	gzip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_linux_* && \
-	zip -r $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.zip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.exe && \
-	zip -r $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.zip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.exe && \
-	rm -f $(BUILD_OUTPUT_DIR)/*.exe
+	fi
 
-docker-builder:
-	docker build -t $(DOCKER_CONTAINER) .
+build-all: modules docker-builder clean
+	mkdir -p $(BUILD_OUTPUT_DIR) && \
+	parallel -v --halt now,fail=1 $(MAKE) ::: \
+		docker-build-linux-armv7 \
+		docker-build-windows-amd64 \
+		docker-build-windows-386 \
+		docker-build-linux-amd64 \
+		docker-build-linux-386 \
+		build-osx \
+		build-freebsd && \
+	gzip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_linux_* && \
+	zip -r -j $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.zip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_386.exe && \
+	zip -r -j $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.zip $(BUILD_OUTPUT_DIR)/$(BIN_PREFIX)_windows_amd64.exe && \
+	rm -f $(BUILD_OUTPUT_DIR)/*.exe
 
 clean:
 	rm -f *.db && \
@@ -92,3 +116,6 @@ linter:
 	golangci-lint run
 
 pedantic: goimports linter
+
+modules:
+	go mod vendor

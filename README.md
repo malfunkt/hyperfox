@@ -112,7 +112,10 @@ key](https://www.ibm.com/support/knowledgecenter/SSZQDR/com.ibm.rba.doc/LD_rootk
 
 There are a [number of ways to install root CA
 certificates](https://www.bounca.org/tutorials/install_root_certificate.html),
-depending on your operating system.
+depending on your operating system. This QR code might come in handy when
+installing Hyperfox's root CA on a mobile device.
+
+![QR](https://chart.googleapis.com/chart?cht=qr&choe=UTF-8&chs=220x220&chl=https://static.hyperfox.org/rootCA.crt)
 
 Use the `--ca-cert` and `--ca-key` flags to provide Hyperfox with the root CA
 certificate and key you'd like to use:

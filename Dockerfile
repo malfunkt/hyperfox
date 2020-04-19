@@ -42,10 +42,10 @@ ENV GO_TARBALL=https://dl.google.com/go/go1.14.2.linux-amd64.tar.gz
 RUN curl --silent -L $GO_TARBALL | tar -xzf - -C /usr/local
 
 ENV GOROOT /usr/local/go
-ENV GOPATH /app
+ENV GOPATH /go
 ENV PATH $PATH:$GOROOT/bin:$GOPATH/bin
 
-WORKDIR /app/src/github.com/malfunkt/hyperfox
+WORKDIR $GOPATH/src/github.com/malfunkt/hyperfox
 COPY . .
 
 RUN go mod vendor
