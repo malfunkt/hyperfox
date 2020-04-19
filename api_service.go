@@ -126,15 +126,21 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 
 	if optRequestBody || optResponseBody {
 
+		var bodyContentType string
 		if optRequestBody {
+			bodyContentType = record.RequestHeader.Header.Get("Content-Type")
 			buf.Write(record.RequestBody)
 		}
 		if optResponseBody {
+			bodyContentType = record.Header.Header.Get("Content-Type")
 			buf.Write(record.Body)
 		}
 
 		if optEmbed {
 			embedContentType := "text/plain; charset=utf-8"
+			if strings.HasPrefix(bodyContentType, "image/") {
+				embedContentType = bodyContentType
+			}
 			w.Header().Set(
 				"Content-Type",
 				embedContentType,

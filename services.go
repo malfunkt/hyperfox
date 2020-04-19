@@ -247,7 +247,11 @@ func startServices() error {
 		if err != nil {
 			log.Fatal("Error starting API server: ", err)
 		}
-		log.Printf("Started API server at %v (auth token: %q)", apiAddr, apiAuthToken)
+		if *flagDisableAPIAuth {
+			log.Printf("Started API server at %v (auth disabled)", apiAddr)
+		} else {
+			log.Printf("Started API server at %v (auth token: %q)", apiAddr, apiAuthToken)
+		}
 	}
 
 	if !*flagUI {
