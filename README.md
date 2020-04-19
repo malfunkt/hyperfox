@@ -115,7 +115,7 @@ certificates](https://www.bounca.org/tutorials/install_root_certificate.html),
 depending on your operating system.
 
 This QR code might come in handy when installing Hyperfox's root CA on a mobile
-device.
+device:
 
 ![Hyperfox root CA certificate](https://chart.googleapis.com/chart?cht=qr&choe=UTF-8&chs=220x220&chl=https://static.hyperfox.org/rootCA.crt)
 
