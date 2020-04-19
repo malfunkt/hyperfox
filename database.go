@@ -28,6 +28,7 @@ const collectionCreateSQL = `CREATE TABLE "` + defaultCaptureCollection + `" (
 	"path" TEXT,
 	"header" TEXT,
 	"body" BLOB,
+	"keywords" BLOB,
 	"request_header" TEXT,
 	"request_body" BLOB,
 	"date_start" DATETIME,

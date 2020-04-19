@@ -37,6 +37,7 @@ type RecordMeta struct {
 type Record struct {
 	RecordMeta `json:",inline" db:",inline"`
 
+	Keywords    []byte `json:"-" db:"keywords"`
 	RequestBody []byte `json:"request_body,omitempty" db:"request_body"`
 	Body        []byte `json:"body,omitempty" db:"body"`
 }
@@ -97,6 +98,7 @@ func (cwc *CaptureWriteCloser) Close() error {
 		},
 		Body:        cwc.Bytes(),
 		RequestBody: reqbody.Bytes(),
+		Keywords:    extractKeywords(cwc, reqbody), // TODO: move to an async job
 	}
 
 	cwc.resp <- resp

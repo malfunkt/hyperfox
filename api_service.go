@@ -23,9 +23,11 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -145,6 +147,15 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 				"Content-Type",
 				embedContentType,
 			)
+
+			gz, err := gzip.NewReader(buf)
+			if err == nil {
+				dest := bytes.NewBuffer(nil)
+				if _, err := io.Copy(dest, gz); err == nil {
+					buf = dest
+				}
+			}
+
 			_, err = w.Write(buf.Bytes())
 			if err != nil {
 				log.Printf("failed to send raw text: %v", err)
@@ -322,11 +333,12 @@ func capturesHandler(w http.ResponseWriter, r *http.Request) {
 
 	if q != "" {
 		terms := strings.Split(q, " ")
-		conds := db.Or()
+		conds := db.And()
 
 		for _, term := range terms {
-			conds = conds.Or(
+			conds = conds.And(
 				db.Or(
+					db.Cond{"keywords LIKE": "%" + term + "%"},
 					db.Cond{"host LIKE": "%" + term + "%"},
 					db.Cond{"origin LIKE": "%" + term + "%"},
 					db.Cond{"path LIKE": "%" + term + "%"},
