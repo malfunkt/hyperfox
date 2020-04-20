@@ -24,9 +24,9 @@ func peek(in io.Reader) []byte {
 
 	gz, err := gzip.NewReader(tee)
 	if err == nil {
-		out.Reset()
-		if _, err := io.CopyN(out, gz, peekLength); err == nil {
-			return bytes.TrimSpace(out.Bytes())
+		dst := bytes.NewBuffer(nil)
+		if _, err := io.CopyN(dst, gz, peekLength); err == nil {
+			return bytes.TrimSpace(dst.Bytes())
 		}
 	}
 

@@ -159,8 +159,9 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 
 			gz, err := gzip.NewReader(tee)
 			if err == nil {
-				out.Reset()
-				_, _ = io.Copy(out, gz)
+				dst := bytes.NewBuffer(nil)
+				_, _ = io.Copy(dst, gz)
+				out = dst
 			} else {
 				_, _ = ioutil.ReadAll(tee)
 			}
