@@ -13,22 +13,25 @@ var (
 )
 
 var (
-	peekLength    = 1024 * 1024 * 10
+	peekLength    = int64(1024 * 1024 * 10)
 	minWordLength = 3
 	space         = []byte{' '}
 )
 
 func peek(in io.Reader) []byte {
-	dest := make([]byte, peekLength)
+	out := bytes.NewBuffer(nil)
+	tee := io.TeeReader(in, out)
 
-	gz, err := gzip.NewReader(in)
+	gz, err := gzip.NewReader(tee)
 	if err == nil {
-		_, _ = gz.Read(dest)
-	} else {
-		_, _ = in.Read(dest)
+		out.Reset()
+		if _, err := io.CopyN(out, gz, peekLength); err == nil {
+			return bytes.TrimSpace(out.Bytes())
+		}
 	}
 
-	return bytes.TrimSpace(dest)
+	io.CopyN(out, in, peekLength)
+	return bytes.TrimSpace(out.Bytes())
 }
 
 func extractKeywords(in ...io.Reader) []byte {

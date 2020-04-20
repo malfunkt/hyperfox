@@ -28,6 +28,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -104,9 +105,12 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 	if optWire {
 		basename = basename + "-raw"
 	}
-	if path.Ext(basename) == "" {
-		basename = basename + ".txt"
+
+	ext := path.Ext(u.Path)
+	if ext == "" {
+		ext = ".txt"
 	}
+	basename = basename + ext
 
 	buf := bytes.NewBuffer(nil)
 
@@ -148,15 +152,18 @@ func replyBinary(w http.ResponseWriter, r *http.Request, record *capture.Record,
 				embedContentType,
 			)
 
-			gz, err := gzip.NewReader(buf)
+			out := bytes.NewBuffer(nil)
+			tee := io.TeeReader(buf, out)
+
+			gz, err := gzip.NewReader(tee)
 			if err == nil {
-				dest := bytes.NewBuffer(nil)
-				if _, err := io.Copy(dest, gz); err == nil {
-					buf = dest
-				}
+				out.Reset()
+				_, _ = io.Copy(out, gz)
+			} else {
+				_, _ = ioutil.ReadAll(tee)
 			}
 
-			_, err = w.Write(buf.Bytes())
+			_, err = w.Write(out.Bytes())
 			if err != nil {
 				log.Printf("failed to send raw text: %v", err)
 			}
