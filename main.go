@@ -37,7 +37,7 @@ import (
 const Version = "2.0.0"
 
 const (
-	defaultAddress = `127.0.0.1`
+	defaultAddress = `0.0.0.0`
 	defaultPort    = uint(1080)
 	defaultTLSPort = uint(10443)
 )

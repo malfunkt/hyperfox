@@ -89,7 +89,7 @@ require-version:
 require-access-token:
 	@if [[ -z "$(GH_ACCESS_TOKEN)" ]]; then echo "Missing \$$GH_ACCESS_TOKEN"; exit 1; fi
 
-release: require-version require-access-token
+release: require-version require-access-token build-all
 	RESP=$$(curl --silent --data '{ \
 		"tag_name": "v$(VERSION)", \
 		"name": "v$(VERSION)", \
