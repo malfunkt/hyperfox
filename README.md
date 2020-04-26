@@ -193,7 +193,7 @@ Hyperfox will capture the request and print it to its output:
 
 ### Via ARP Spoofing on a LAN
 
-See [MITM attack with arpfox and Hyperfox](https://xiam.dev/mitm-attack-with-arpfox-and-hyperfox/).
+See [MITM attack with Hyperfox and arpfox](https://xiam.dev/mitm-attack-with-hyperfox-and-arpfox/).
 
 ## Hacking
 
