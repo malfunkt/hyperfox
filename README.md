@@ -18,10 +18,20 @@ If you'd rather not accept free candy from this van you can also grab a release
 from our [releases page](https://github.com/malfunkt/hyperfox/releases) and
 install it manually.
 
+### Building `hyperfox` from source
+
+In order to build `hyperfox` from source you'll need Go and a C compiler:
+
+Use `go install` to build and install `hyperfox`:
+
+```
+go install github.com/malfunkt/hyperfox
+```
+
 ## How does it work?
 
 Hyperfox creates a transparent HTTP proxy server and binds it to port 1080/TCP
-on localhost (`--addr 127.0.0.1 --http 1080`). The proxy server reads plaintext
+on localhost (`-addr 127.0.0.1 -http 1080`). The proxy server reads plaintext
 HTTP requests and redirects them to the target destination (the `Host` header
 is used to identify the destination), when the target destination replies,
 Hyperfox intercepts the response and forwards it to the original client.
@@ -30,7 +40,7 @@ All HTTP communications between origin and destination are intercepted by
 Hyperfox and recorded on a SQLite database that is created automatically.
 Everytime Hyperfox starts, a new database is created (e.g.:
 `hyperfox-00123.db`). You can change this behaviour by explicitly providing a
-database name (e.g.: `--db traffic-log.db`).
+database name (e.g.: `-db traffic-log.db`).
 
 ### Usage
 
@@ -54,22 +64,22 @@ you should be able to see a log for the page you requested in Hyperfox's output:
 127.0.0.1:44254 - - [11/Apr/2020:19:19:48 -0500] "GET http://example.com/ HTTP/1.1" 200 -1
 ```
 
-### User interface (`--ui`)
+### User interface (`-ui`)
 
 ![hyperfox-ui](https://user-images.githubusercontent.com/385670/79090465-6e7eb300-7d0f-11ea-8fc6-df1e6da8a12e.png)
 
-Use the `--ui` parameter to enable Hyperfox UI wich will open in a new browser
+Use the `-ui` parameter to enable Hyperfox UI wich will open in a new browser
 window:
 
 ```
-hyperfox --db records.db --ui
+hyperfox -db records.db -ui
 ```
 
 The above command creates a web server that binds to `127.0.0.1:1984`. If you'd
-like to change the bind address or port use the `--ui-addr` switch:
+like to change the bind address or port use the `-ui-addr` switch:
 
 ```
-hyperfox --db records.db --ui --ui-addr 127.0.0.1:3000
+hyperfox -db records.db -ui -ui-addr 127.0.0.1:3000
 ```
 
 Changing the UI server address is specially useful when Hyperfox is running on
@@ -84,14 +94,14 @@ might not be adecuate.
 
 #### Run Hyperfox UI on your mobile device
 
-When the `--ui-addr`parameter is different from `127.0.0.1` Hyperfox will
+When the `-ui-addr`parameter is different from `127.0.0.1` Hyperfox will
 output a QR code to make it easier to connect from mobile devices:
 
 ```
-hyperfox --db records.db --ui --ui-addr 192.168.1.23:1984
+hyperfox -db records.db -ui -ui-addr 192.168.1.23:1984
 ```
 
-### SSL/TLS mode (`--ca-cert` & `--ca-key`)
+### SSL/TLS mode (`-ca-cert` & `-ca-key`)
 
 SSL/TLS connections are secure end to end and protected from eavesdropping.
 Hyperfox won't be able to see anything happening between a client and a secure
@@ -119,11 +129,11 @@ device:
 
 ![Hyperfox root CA certificate](https://chart.googleapis.com/chart?cht=qr&choe=UTF-8&chs=220x220&chl=https://static.hyperfox.org/rootCA.crt)
 
-Use the `--ca-cert` and `--ca-key` flags to provide Hyperfox with the root CA
+Use the `-ca-cert` and `-ca-key` flags to provide Hyperfox with the root CA
 certificate and key you'd like to use:
 
 ```
-hyperfox --ca-cert rootCA.crt --ca-key rootCA.key
+hyperfox -ca-cert rootCA.crt -ca-key rootCA.key
 ```
 
 the above command creates a special server and binds it to `127.0.0.1:10443`,
@@ -135,20 +145,20 @@ this certificate is signed with the providede root CA key.
 
 #### TLS interception example
 
-Launch Hyperfox with appropriate TLS parameters and `--http 443` (port 443
+Launch Hyperfox with appropriate TLS parameters and `-http 443` (port 443
 requires admin privileges).
 
 ```
-sudo hyperfox --ca-cert ./ca/rootCA.crt --ca-key ./ca/rootCA.key --https 443
+sudo hyperfox -ca-cert ./ca/rootCA.crt -ca-key ./ca/rootCA.key -https 443
 ```
 
-Use cURL to build a HTTPs request to example.com: the `--resolve` option tells
+Use cURL to build a HTTPs request to example.com: the `-resolve` option tells
 cURL to skip DNS verification and use `127.0.0.1` as if it were the legitimate
 address for `example.com`, while the `-k` parameter tells cURL to accept any
 TLS certificate.
 
 ```
-curl -k --resolve example.com:443:127.0.0.1 https://example.com
+curl -k -resolve example.com:443:127.0.0.1 https://example.com
 ```
 
 you should be able to see a log for the page you requested in Hyperfox's output:
@@ -169,11 +179,11 @@ example.com 127.0.0.1
 
 Run Hyperfox with the options you'd like, just remember that you should use
 ports 80 for HTTP and 443 for HTTPS, and that requires admin privileges. In
-addition to `--http` and `--https` use the `--dns` parameter with a valid DNS
+addition to `-http` and `-https` use the `-dns` parameter with a valid DNS
 resolver:
 
 ```
-sudo hyperfox --ui --http 80 --dns 8.8.8.8
+sudo hyperfox -ui -http 80 -dns 8.8.8.8
 ```
 
 that will make Hyperfox skip the OS DNS resolver and use an alternative one
