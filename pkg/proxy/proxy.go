@@ -412,7 +412,9 @@ func (p *Proxy) StartTLS(addr string) error {
 
 	p.srv = srv
 	p.ln = ln
-	p.rt = &http.Transport{}
+	p.rt = &http.Transport{
+		DialContext: p.dialContext,
+	}
 
 	log.Printf("Listening for HTTP requests at %s (SSL/TLS mode)\n", addr)
 	if err := p.srv.Serve(tlsListener); err != nil {
