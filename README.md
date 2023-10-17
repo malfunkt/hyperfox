@@ -68,7 +68,7 @@ you should be able to see a log for the page you requested in Hyperfox's output:
 
 ![hyperfox-ui](https://user-images.githubusercontent.com/385670/79090465-6e7eb300-7d0f-11ea-8fc6-df1e6da8a12e.png)
 
-Use the `-ui` parameter to enable Hyperfox UI wich will open in a new browser
+Use the `-ui` parameter to enable Hyperfox UI which will open in a new browser
 window:
 
 ```
@@ -90,7 +90,7 @@ consumed by the front-end application.
 
 Please note that Hyperfox's REST API is only protected by a randomly generated
 key that changes everytime Hyperfox starts, depending on your use case this
-might not be adecuate.
+might not be adequate.
 
 #### Run Hyperfox UI on your mobile device
 
